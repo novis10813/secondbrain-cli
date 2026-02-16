@@ -81,7 +81,7 @@ export class NoteParser {
     );
     const headings = this.extractHeadings(body, codeRanges, content, bodyStartIndex);
     const bodyBlockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
-    const embeds = this.extractEmbeds(body, content, bodyStartIndex);
+    const embeds = this.extractEmbeds(body, codeRanges, content, bodyStartIndex);
     const blockRefs = this.mergeBlockRefsFromLinks(bodyBlockRefs, links, embeds);
 
     return {
@@ -301,15 +301,17 @@ export class NoteParser {
 
   private static extractEmbeds(
     body: string,
+    codeRanges: Array<[number, number]>,
     content: string,
     bodyStartIndex: number
   ): EmbedRef[] {
     const result: EmbedRef[] = [];
     const seen = new Set<string>();
-    // Obsidian embeds: ![[path]] or ![[path|display]]
+    // Obsidian embeds: ![[path]] or ![[path|display]]; skip inside code blocks
     const embedRegex = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match;
     while ((match = embedRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
       const target = match[1].trim();
       if (seen.has(target)) continue;
       seen.add(target);

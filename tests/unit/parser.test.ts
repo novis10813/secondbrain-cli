@@ -317,6 +317,23 @@ First [[a]] then ![[b]] then [[c]].`;
       expect(parsed.links).toHaveLength(2);
       expect(parsed.embeds).toHaveLength(1);
     });
+
+    it('does not extract embeds inside code blocks', () => {
+      const content = `# Doc
+
+Real embed ![[image.png]].
+
+\`\`\`md
+![[code-block-embed]]
+\`\`\`
+
+Inline \`![[fake]]\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.embeds).toHaveLength(1);
+      expect(parsed.embeds[0].target).toBe('image.png');
+    });
   });
 
   describe('position extraction', () => {
