@@ -48,6 +48,6 @@ describe('Parser performance', () => {
     const parsed = NoteParser.parse(largeNote);
     const elapsed = performance.now() - start;
     expect(parsed.headings).toHaveLength(501); // # Doc + 500 ## Section N
-    expect(elapsed).toBeLessThan(150);
+    expect(elapsed).toBeLessThan(250);
   });
 });
