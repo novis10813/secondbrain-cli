@@ -54,6 +54,14 @@ export interface EmbedRef {
   position: Pos;
 }
 
+export interface ListItemRef {
+  level: number;
+  task?: string;
+  line: number;
+  column: number;
+  position: Pos;
+}
+
 export interface ParsedNote {
   title: string;
   content: string;
@@ -65,6 +73,7 @@ export interface ParsedNote {
   headingStructure: HeadingStructure[];
   blockRefs: BlockRef[];
   embeds: EmbedRef[];
+  listItems: ListItemRef[];
 }
 
 export class NoteParser {
@@ -94,6 +103,7 @@ export class NoteParser {
     const bodyBlockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
     const embeds = this.extractEmbeds(body, codeRanges, content, bodyStartIndex);
     const blockRefs = this.mergeBlockRefsFromLinks(bodyBlockRefs, links, embeds);
+    const listItems = this.extractListItems(body, codeRanges, content, bodyStartIndex);
 
     return {
       title,
@@ -105,7 +115,8 @@ export class NoteParser {
       headings,
       headingStructure,
       blockRefs,
-      embeds
+      embeds,
+      listItems
     };
   }
 
@@ -334,6 +345,43 @@ export class NoteParser {
         bodyStartIndex + match.index + match[0].length
       );
       result.push({ target, line: pos.line, column: pos.column, position });
+    }
+    return result;
+  }
+
+  private static extractListItems(
+    body: string,
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number
+  ): ListItemRef[] {
+    const result: ListItemRef[] = [];
+    // Match list items: unordered (-, *, +) or ordered (1., 2., etc.)
+    // Also match task items: - [ ] or - [x] or - [X]
+    // Pattern: (indentation)(marker)(optional task checkbox)(content)
+    const listItemRegex = /^(\s*)([-*+]|\d+\.)\s+(\[([ xX])\])?\s*(.+)$/gm;
+    let match;
+    while ((match = listItemRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
+      const indent = match[1];
+      const level = Math.floor(indent.length / 2); // Typically 2 spaces per level
+      const taskCheckbox = match[3]; // '[x]', '[X]', '[ ]', or undefined
+      const taskChar = match[4]; // 'x', 'X', ' ', or undefined
+      // task is 'x' for checked tasks, undefined for unchecked/non-task items
+      const task = taskCheckbox && (taskChar === 'x' || taskChar === 'X') ? 'x' : undefined;
+      const pos = this.indexToPosition(body, match.index);
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({
+        level,
+        task,
+        line: pos.line,
+        column: pos.column,
+        position
+      });
     }
     return result;
   }

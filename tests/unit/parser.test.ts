@@ -489,6 +489,218 @@ Inline \`![[fake]]\` ignored.`;
     });
   });
 
+  describe('list structure extraction', () => {
+    it('extracts simple unordered list items', () => {
+      const content = `# Doc
+
+- Item 1
+- Item 2
+- Item 3`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(3);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(0);
+      expect(parsed.listItems[2].level).toBe(0);
+      expect(parsed.listItems[0].task).toBeUndefined();
+    });
+
+    it('extracts nested list items with hierarchy', () => {
+      const content = `# Doc
+
+- Level 0
+  - Level 1
+    - Level 2
+  - Level 1 again
+- Back to Level 0`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(5);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(1);
+      expect(parsed.listItems[2].level).toBe(2);
+      expect(parsed.listItems[3].level).toBe(1);
+      expect(parsed.listItems[4].level).toBe(0);
+    });
+
+    it('extracts ordered list items', () => {
+      const content = `# Doc
+
+1. First item
+2. Second item
+3. Third item`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(3);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(0);
+      expect(parsed.listItems[2].level).toBe(0);
+    });
+
+    it('extracts task items with checkboxes', () => {
+      const content = `# Doc
+
+- [ ] Unchecked task
+- [x] Checked task
+- [X] Checked task uppercase
+- Regular item`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(4);
+      expect(parsed.listItems[0].task).toBeUndefined(); // unchecked
+      expect(parsed.listItems[1].task).toBe('x'); // checked
+      expect(parsed.listItems[2].task).toBe('x'); // checked uppercase
+      expect(parsed.listItems[3].task).toBeUndefined(); // non-task
+    });
+
+    it('extracts nested task items', () => {
+      const content = `# Doc
+
+- [ ] Parent task
+  - [x] Child task
+    - [ ] Grandchild task`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(3);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[0].task).toBeUndefined();
+      expect(parsed.listItems[1].level).toBe(1);
+      expect(parsed.listItems[1].task).toBe('x');
+      expect(parsed.listItems[2].level).toBe(2);
+      expect(parsed.listItems[2].task).toBeUndefined();
+    });
+
+    it('list items include position (line, column)', () => {
+      const content = `# Doc
+
+- First item
+  - Nested item
+- Second item`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(3);
+      expect(parsed.listItems[0].line).toBe(2);
+      expect(parsed.listItems[0].column).toBeGreaterThan(0);
+      expect(parsed.listItems[1].line).toBe(4);
+      expect(parsed.listItems[2].line).toBe(5);
+    });
+
+    it('list items have position with start/end Loc and offset', () => {
+      const content = `# Doc
+
+- Item with position`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(1);
+      expect(parsed.listItems[0].position).toBeDefined();
+      expect(parsed.listItems[0].position.start).toMatchObject({ line: 1, col: 0 });
+      expect(parsed.listItems[0].position.end.offset).toBeGreaterThan(
+        parsed.listItems[0].position.start.offset
+      );
+    });
+
+    it('does not extract list items inside code blocks', () => {
+      const content = `# Doc
+
+Real list:
+- Real item
+
+\`\`\`
+- Fake in code block
+\`\`\`
+
+Inline \`- fake\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(1);
+      expect(parsed.listItems[0].level).toBe(0);
+    });
+
+    it('handles mixed list types (unordered and ordered)', () => {
+      const content = `# Doc
+
+- Unordered item
+1. Ordered item
+- Another unordered
+2. Another ordered`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(4);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(0);
+      expect(parsed.listItems[2].level).toBe(0);
+      expect(parsed.listItems[3].level).toBe(0);
+    });
+
+    it('handles list items with frontmatter', () => {
+      const content = `---
+tags: [test]
+---
+
+# Doc
+
+- Item 1
+- Item 2`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(2);
+      expect(parsed.listItems[0].line).toBe(2); // body-relative line
+      expect(parsed.listItems[1].line).toBe(4);
+    });
+
+    it('handles empty list', () => {
+      const content = `# Doc
+
+No lists here.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(0);
+    });
+
+    it('handles list items with asterisk and plus markers', () => {
+      const content = `# Doc
+
+* Item with asterisk
++ Item with plus
+- Item with dash`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(3);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(0);
+      expect(parsed.listItems[2].level).toBe(0);
+    });
+
+    it('handles deeply nested lists', () => {
+      const content = `# Doc
+
+- Level 0
+    - Level 1
+        - Level 2
+            - Level 3`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.listItems).toHaveLength(4);
+      expect(parsed.listItems[0].level).toBe(0);
+      expect(parsed.listItems[1].level).toBe(2); // 4 spaces = level 2
+      expect(parsed.listItems[2].level).toBe(4); // 8 spaces = level 4
+      expect(parsed.listItems[3].level).toBe(6); // 12 spaces = level 6
+    });
+  });
+
   describe('position extraction', () => {
     it('links have position with start/end Loc and offset', () => {
       const content = `# Doc
