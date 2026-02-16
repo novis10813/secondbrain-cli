@@ -42,7 +42,7 @@ export function createCaptureCommand(): Command {
             frontmatter = parsed.frontmatter;
             // Merge tags
             if (parsed.tags.length > 0) {
-              tags.push(...parsed.tags);
+              tags.push(...parsed.tags.map(t => t.name));
             }
           }
         }

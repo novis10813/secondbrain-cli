@@ -61,7 +61,8 @@ export class VaultManager {
       if (note) {
         // Resolve link titles to note IDs
         const linkIds: string[] = [];
-        for (const linkTitle of parsed.links) {
+        for (const link of parsed.links) {
+          const linkTitle = link.target;
           const linkedNote = this.findNoteByTitleOrPath(linkTitle);
           if (linkedNote) {
             linkIds.push(linkedNote.id);
@@ -113,13 +114,17 @@ export class VaultManager {
     const fullPath = join(this.config.vaultPath, path);
     const stats = statSync(fullPath);
 
+    const ext = extname(path) || '.md';
+    const name = basename(path, ext) || basename(path);
     return {
       id: hash,
       path,
+      name,
+      extension: ext,
       title: parsed.title,
       content: parsed.content,
       frontmatter: parsed.frontmatter,
-      tags: parsed.tags,
+      tags: parsed.tags.map(t => t.name),
       links: links,
       backlinks: [], // Will be computed by database
       hash,

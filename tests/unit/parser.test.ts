@@ -42,8 +42,8 @@ title: Note with tags
 
       const parsed = NoteParser.parse(content);
 
-      expect(parsed.tags).toContain('tag1');
-      expect(parsed.tags).toContain('tag2/sub');
+      expect(parsed.tags.some(t => t.name === 'tag1')).toBe(true);
+      expect(parsed.tags.some(t => t.name === 'tag2/sub')).toBe(true);
     });
 
     it('應該從內文提取 Obsidian 連結', () => {
@@ -57,8 +57,8 @@ title: Linked Note
 
       const parsed = NoteParser.parse(content);
 
-      expect(parsed.links).toContain('另一篇筆記');
-      expect(parsed.links).toContain('筆記名稱');
+      expect(parsed.links.some(l => l.target === '另一篇筆記')).toBe(true);
+      expect(parsed.links.some(l => l.target === '筆記名稱')).toBe(true);
     });
 
     it('當沒有 H1 標題時應該使用第一行作為標題', () => {
@@ -77,6 +77,69 @@ title: Linked Note
       const parsed = NoteParser.parse(content);
 
       expect(parsed.title).toBe('Untitled');
+    });
+
+    it('links include position (line, column)', () => {
+      const content = `# Doc
+
+See [[First]] and [[Second|label]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      const first = parsed.links.find(l => l.target === 'First');
+      const second = parsed.links.find(l => l.target === 'Second');
+      expect(first).toBeDefined();
+      expect(first!.line).toBe(3);
+      expect(first!.column).toBeGreaterThan(0);
+      expect(second).toBeDefined();
+      expect(second!.line).toBe(3);
+    });
+
+    it('tags include position (line, column)', () => {
+      const content = `# Doc
+
+Text with #foo and #bar/baz.`;
+
+      const parsed = NoteParser.parse(content);
+
+      const foo = parsed.tags.find(t => t.name === 'foo');
+      const bar = parsed.tags.find(t => t.name === 'bar/baz');
+      expect(foo).toBeDefined();
+      expect(foo!.line).toBe(3);
+      expect(bar).toBeDefined();
+      expect(bar!.line).toBe(3);
+    });
+
+    it('headings include level, text, and position', () => {
+      const content = `# One
+
+## Two
+
+### Three`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.headings).toHaveLength(3);
+      expect(parsed.headings[0]).toEqual({ level: 1, text: 'One', line: 1, column: 1 });
+      expect(parsed.headings[1]).toEqual({ level: 2, text: 'Two', line: 3, column: 1 });
+      expect(parsed.headings[2]).toEqual({ level: 3, text: 'Three', line: 5, column: 1 });
+    });
+
+    it('frontmatter tags have position line 1, body link has body-relative line', () => {
+      const content = `---
+tags: [a, b]
+---
+
+# T
+
+[[x]]`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.tags.filter(t => t.name === 'a' || t.name === 'b').every(t => t.line === 1)).toBe(true);
+      const link = parsed.links.find(l => l.target === 'x');
+      expect(link).toBeDefined();
+      expect(link!.line).toBe(3); // body line (first line of body is # T)
     });
   });
 

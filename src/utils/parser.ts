@@ -1,12 +1,37 @@
 import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
+export interface Position {
+  line: number;
+  column: number;
+}
+
+export interface LinkRef {
+  target: string;
+  line: number;
+  column: number;
+}
+
+export interface TagRef {
+  name: string;
+  line: number;
+  column: number;
+}
+
+export interface HeadingRef {
+  level: number;
+  text: string;
+  line: number;
+  column: number;
+}
+
 export interface ParsedNote {
   title: string;
   content: string;
   frontmatter: Record<string, unknown>;
-  tags: string[];
-  links: string[];
+  tags: TagRef[];
+  links: LinkRef[];
+  headings: HeadingRef[];
 }
 
 export class NoteParser {
@@ -15,14 +40,44 @@ export class NoteParser {
     const title = this.extractTitle(body);
     const tags = this.extractTags(frontmatter, body);
     const links = this.extractLinks(frontmatter, body);
+    const headings = this.extractHeadings(body);
 
     return {
       title,
       content: body,
       frontmatter,
       tags,
-      links
+      links,
+      headings
     };
+  }
+
+  private static indexToPosition(content: string, index: number): Position {
+    const before = content.slice(0, index);
+    const lastNewline = before.lastIndexOf('\n');
+    const line = (before.match(/\n/g)?.length ?? 0) + 1;
+    const column = lastNewline === -1 ? index + 1 : index - lastNewline;
+    return { line, column };
+  }
+
+  private static getCodeBlockRanges(content: string): Array<[number, number]> {
+    const ranges: Array<[number, number]> = [];
+    const fenced = /```[^`]*?```/g;
+    let m;
+    while ((m = fenced.exec(content)) !== null) {
+      ranges.push([m.index, m.index + m[0].length]);
+    }
+    const inline = /`[^`]*`/g;
+    while ((m = inline.exec(content)) !== null) {
+      if (!ranges.some(([s, e]) => m!.index >= s && m!.index < e)) {
+        ranges.push([m.index, m.index + m[0].length]);
+      }
+    }
+    return ranges;
+  }
+
+  private static isInCodeBlock(index: number, ranges: Array<[number, number]>): boolean {
+    return ranges.some(([s, e]) => index >= s && index < e);
   }
 
   static computeHash(content: string): string {
@@ -62,67 +117,100 @@ export class NoteParser {
     return 'Untitled';
   }
 
-  private static extractTags(frontmatter: Record<string, unknown>, content: string): string[] {
-    const tags = new Set<string>();
+  private static extractTags(frontmatter: Record<string, unknown>, body: string): TagRef[] {
+    const seen = new Set<string>();
+    const result: TagRef[] = [];
+    const fmLine = { line: 1, column: 1 };
 
-    // From frontmatter
     if (frontmatter.tags) {
       if (Array.isArray(frontmatter.tags)) {
-        frontmatter.tags.forEach(tag => tags.add(String(tag)));
+        for (const tag of frontmatter.tags) {
+          const name = String(tag).replace(/^#/, '');
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            result.push({ name, ...fmLine });
+          }
+        }
       } else if (typeof frontmatter.tags === 'string') {
-        frontmatter.tags.split(/[,\s]+/).forEach(tag => {
-          if (tag) tags.add(tag.replace(/^#/, ''));
-        });
+        for (const tag of frontmatter.tags.split(/[,\s]+/)) {
+          const name = tag.replace(/^#/, '');
+          if (name && !seen.has(name)) {
+            seen.add(name);
+            result.push({ name, ...fmLine });
+          }
+        }
       }
     }
 
-    // From content body (Obsidian-style #tags)
-    // Strip code blocks to avoid extracting tags from code
-    const contentWithoutCode = content
-      .replace(/```[\s\S]*?```/g, '')  // Remove fenced code blocks
-      .replace(/`[^`]*`/g, '');          // Remove inline code
-    
+    const codeRanges = this.getCodeBlockRanges(body);
     const tagRegex = /#([\w/-]+)/g;
     let match;
-    while ((match = tagRegex.exec(contentWithoutCode)) !== null) {
-      // Exclude headings
-      if (!contentWithoutCode.substring(match.index - 1, match.index).match(/\n|^/)) {
-        continue;
-      }
-      tags.add(match[1]);
+    while ((match = tagRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
+      const charBefore = match.index === 0 ? '\n' : body[match.index - 1];
+      const atLineStart = charBefore === '\n' || charBefore === '\r';
+      if (atLineStart && body.slice(match.index).match(/^#{1,6}\s+/)) continue; // heading
+      if (!atLineStart && !/[\s]/.test(charBefore)) continue; // require space/newline before #tag
+      const name = match[1];
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const pos = this.indexToPosition(body, match.index);
+      result.push({ name, line: pos.line, column: pos.column });
     }
 
-    return Array.from(tags);
+    return result;
   }
 
-  private static extractLinks(frontmatter: Record<string, unknown>, content: string): string[] {
-    const links = new Set<string>();
+  private static extractLinks(frontmatter: Record<string, unknown>, body: string): LinkRef[] {
+    const result: LinkRef[] = [];
+    const seen = new Set<string>();
+    const fmPos = { line: 1, column: 1 };
 
-    // Extract from frontmatter values
-    this.extractLinksFromObject(frontmatter, links);
+    this.extractLinksFromObject(frontmatter, (target) => {
+      if (!seen.has(target)) {
+        seen.add(target);
+        result.push({ target, ...fmPos });
+      }
+    });
 
-    // Extract from content body (Obsidian wikilinks)
     const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match;
-    while ((match = linkRegex.exec(content)) !== null) {
-      links.add(match[1].trim());
+    while ((match = linkRegex.exec(body)) !== null) {
+      const target = match[1].trim();
+      if (seen.has(target)) continue;
+      seen.add(target);
+      const pos = this.indexToPosition(body, match.index);
+      result.push({ target, line: pos.line, column: pos.column });
     }
 
-    return Array.from(links);
+    return result;
   }
 
-  private static extractLinksFromObject(obj: unknown, links: Set<string>): void {
+  private static extractLinksFromObject(obj: unknown, onLink: (target: string) => void): void {
     if (typeof obj === 'string') {
       const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
       let match;
       while ((match = linkRegex.exec(obj)) !== null) {
-        links.add(match[1].trim());
+        onLink(match[1].trim());
       }
     } else if (Array.isArray(obj)) {
-      obj.forEach(item => this.extractLinksFromObject(item, links));
+      obj.forEach(item => this.extractLinksFromObject(item, onLink));
     } else if (obj && typeof obj === 'object') {
-      Object.values(obj).forEach(value => this.extractLinksFromObject(value, links));
+      Object.values(obj).forEach(value => this.extractLinksFromObject(value, onLink));
     }
+  }
+
+  private static extractHeadings(body: string): HeadingRef[] {
+    const result: HeadingRef[] = [];
+    const headingRegex = /^(#{1,6})\s+(.+)$/gm;
+    let match;
+    while ((match = headingRegex.exec(body)) !== null) {
+      const level = match[1].length;
+      const text = match[2].trim();
+      const pos = this.indexToPosition(body, match.index);
+      result.push({ level, text, line: pos.line, column: pos.column });
+    }
+    return result;
   }
 
   static generateNoteContent(

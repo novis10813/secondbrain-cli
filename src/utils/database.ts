@@ -1,3 +1,4 @@
+import { basename, extname } from 'path';
 import type { Note, Config, GraphData } from '../types/index.js';
 import { Database } from 'bun:sqlite';
 
@@ -218,10 +219,14 @@ export class DatabaseManager {
   private rowToNote(row: any): Note {
     const links = this.db.prepare('SELECT target_id FROM links WHERE source_id = ?').all(row.id);
     const backlinks = this.db.prepare('SELECT source_id FROM links WHERE target_id = ?').all(row.id);
+    const ext = extname(row.path) || '.md';
+    const name = basename(row.path, ext) || basename(row.path);
 
     return {
       id: row.id,
       path: row.path,
+      name,
+      extension: ext,
       title: row.title,
       content: row.content,
       frontmatter: JSON.parse(row.frontmatter),
@@ -291,10 +296,14 @@ export class DatabaseManager {
     return rows.map(row => {
       const links = linkData.get(row.id)?.links || [];
       const backlinks = linkData.get(row.id)?.backlinks || [];
-      
+      const ext = extname(row.path) || '.md';
+      const name = basename(row.path, ext) || basename(row.path);
+
       return {
         id: row.id,
         path: row.path,
+        name,
+        extension: ext,
         title: row.title,
         content: row.content,
         frontmatter: JSON.parse(row.frontmatter),
