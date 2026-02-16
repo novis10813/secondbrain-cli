@@ -18,16 +18,14 @@ export function createOrphansCommand(): Command {
         const config = configManager.getConfig();
         const vault = new VaultManager(config);
 
-        const orphans = vault.getOrphans();
+        const orphans = vault.getOrphanFiles();
 
         if (options.format === 'json') {
           console.log(JSON.stringify({
             count: orphans.length,
             orphans: orphans.map(o => ({
-              id: o.id,
-              title: o.title,
               path: o.path,
-              tags: o.tags
+              basename: o.basename
             }))
           }, null, 2));
         } else {
@@ -35,11 +33,9 @@ export function createOrphansCommand(): Command {
             console.log('✅ No orphan notes found. All notes are connected!');
           } else {
             console.log(`⚠️  Found ${orphans.length} orphan note(s):\n`);
-            orphans.forEach((note, i) => {
-              console.log(`${i + 1}. ${note.title}`);
-              console.log(`   Path: ${note.path}`);
-              console.log(`   ID: ${note.id}`);
-              console.log(`   Tags: ${note.tags.join(', ') || 'none'}`);
+            orphans.forEach((file, i) => {
+              console.log(`${i + 1}. ${file.basename}`);
+              console.log(`   Path: ${file.path}`);
               console.log();
             });
           }

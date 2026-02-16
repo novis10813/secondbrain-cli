@@ -405,6 +405,74 @@ export class DatabaseManager {
 		stmt.run(targetPath, targetId, sourcePath, startOffset);
 	}
 
+	/** Get files that link to the given file path (new structure). */
+	getBacklinksByPath(filePath: string): FileInfo[] {
+		const rows = this.db.prepare(`
+			SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
+			FROM files f
+			INNER JOIN (SELECT DISTINCT source_path FROM links_with_positions WHERE target_path = ?) l
+				ON f.path = l.source_path
+		`).all(filePath) as any[];
+		return rows.map(row => ({
+			path: row.path,
+			name: row.name,
+			basename: row.basename,
+			extension: row.extension,
+			parent: row.parent,
+			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
+		}));
+	}
+
+	/** Get files with no incoming or outgoing links (new structure). */
+	getOrphanFiles(): FileInfo[] {
+		const rows = this.db.prepare(`
+			SELECT * FROM files f
+			WHERE NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.source_path = f.path)
+			AND NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.target_path = f.path)
+		`).all() as any[];
+		return rows.map(row => ({
+			path: row.path,
+			name: row.name,
+			basename: row.basename,
+			extension: row.extension,
+			parent: row.parent,
+			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
+		}));
+	}
+
+	/** Search files by path/basename and optional tags (new structure). */
+	searchFiles(
+		query: string,
+		tags?: string[],
+		limit: number = 20
+	): Array<{ file: FileInfo; tags: string[] }> {
+		const like = `%${query}%`;
+		let sql = `
+			SELECT f.*, (SELECT group_concat(DISTINCT tag) FROM tags_with_positions WHERE file_path = f.path) AS tags_str
+			FROM files f
+			WHERE (f.path LIKE ? OR f.basename LIKE ?)
+		`;
+		const params: (string | number)[] = [like, like];
+		if (tags && tags.length > 0) {
+			sql += ` AND f.path IN (SELECT file_path FROM tags_with_positions WHERE tag IN (${tags.map(() => '?').join(',')}))`;
+			params.push(...tags);
+		}
+		sql += ` ORDER BY f.mtime DESC LIMIT ?`;
+		params.push(limit);
+		const rows = this.db.prepare(sql).all(...params) as any[];
+		return rows.map(row => ({
+			file: {
+				path: row.path,
+				name: row.name,
+				basename: row.basename,
+				extension: row.extension,
+				parent: row.parent,
+				stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
+			},
+			tags: row.tags_str ? row.tags_str.split(',') : []
+		}));
+	}
+
   // ContentMetadata operations
   upsertContentMetadata(filePath: string, metadata: ContentMetadata, contentHash: string): void {
     // Prepare statements outside transaction
@@ -930,10 +998,13 @@ export class DatabaseManager {
   }
 
   getStats(): { totalNotes: number; totalLinks: number; orphans: number } {
-    const totalNotes = this.db.prepare('SELECT COUNT(*) as count FROM notes').get().count;
-    const totalLinks = this.db.prepare('SELECT COUNT(*) as count FROM links').get().count;
-    const orphans = this.db.prepare('SELECT COUNT(*) as count FROM notes n LEFT JOIN links l1 ON n.id = l1.source_id LEFT JOIN links l2 ON n.id = l2.target_id WHERE l1.source_id IS NULL AND l2.target_id IS NULL').get().count;
-    
+    const totalNotes = (this.db.prepare('SELECT COUNT(*) AS count FROM files').get() as { count: number }).count;
+    const totalLinks = (this.db.prepare('SELECT COUNT(*) AS count FROM links_with_positions').get() as { count: number }).count;
+    const orphans = (this.db.prepare(`
+      SELECT COUNT(*) AS count FROM files f
+      WHERE NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.source_path = f.path)
+      AND NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.target_path = f.path)
+    `).get() as { count: number }).count;
     return { totalNotes, totalLinks, orphans };
   }
 

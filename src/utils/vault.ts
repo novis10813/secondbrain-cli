@@ -259,7 +259,7 @@ export class VaultManager {
     return join(this.config.templatesFolder, `${templateName}.md`);
   }
 
-  // Database proxy methods
+  // Database proxy methods (legacy note-based, used by sync/capture)
   getNoteById(id: string): Note | null {
     return this.db.getNoteById(id);
   }
@@ -282,6 +282,23 @@ export class VaultManager {
 
   getStats() {
     return this.db.getStats();
+  }
+
+  // New structure (files + content_metadata + links_with_positions)
+  getBacklinksByPath(filePath: string): FileInfo[] {
+    return this.db.getBacklinksByPath(filePath);
+  }
+
+  getOrphanFiles(): FileInfo[] {
+    return this.db.getOrphanFiles();
+  }
+
+  searchFiles(
+    query: string,
+    tags?: string[],
+    limit: number = 20
+  ): Array<{ file: FileInfo; tags: string[] }> {
+    return this.db.searchFiles(query, tags, limit);
   }
 
   getGraphData() {

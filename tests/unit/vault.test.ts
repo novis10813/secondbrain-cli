@@ -149,7 +149,7 @@ describe('VaultManager', () => {
     });
   });
 
-  describe('searchNotes', () => {
+  describe('searchFiles (new structure)', () => {
     beforeEach(async () => {
       vaultManager.writeNote('api-design.md', '# API Design\n\nRESTful API 設計原則');
       vaultManager.writeNote('backend.md', '# Backend\n\n後端開發注意事項');
@@ -158,57 +158,54 @@ describe('VaultManager', () => {
       await vaultManager.sync();
     });
 
-    it('應該搜尋標題', () => {
-      const results = vaultManager.searchNotes('API');
+    it('應該依 path/basename 搜尋', () => {
+      const results = vaultManager.searchFiles('api');
       
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some(n => n.title === 'API Design')).toBe(true);
+      expect(results.some(r => r.file.basename === 'api-design')).toBe(true);
     });
 
-    it('應該搜尋內容', () => {
-      const results = vaultManager.searchNotes('後端');
+    it('應該依 basename 搜尋', () => {
+      const results = vaultManager.searchFiles('backend');
       
       expect(results.length).toBeGreaterThan(0);
-      expect(results.some(n => n.title === 'Backend')).toBe(true);
+      expect(results.some(r => r.file.basename === 'backend')).toBe(true);
     });
 
     it('應該支援標籤過濾', async () => {
       vaultManager.writeNote('tagged.md', '---\ntags: [work]\n---\n\n# Tagged Note');
       await vaultManager.sync();
       
-      const results = vaultManager.searchNotes('', ['work']);
+      const results = vaultManager.searchFiles('', ['work']);
       
-      expect(results.some(n => n.title === 'Tagged Note')).toBe(true);
+      expect(results.some(r => r.file.basename === 'tagged')).toBe(true);
     });
 
     it('應該限制結果數量', () => {
-      const results = vaultManager.searchNotes('', undefined, 2);
+      const results = vaultManager.searchFiles('', undefined, 2);
       
       expect(results.length).toBeLessThanOrEqual(2);
     });
   });
 
-  describe('getBacklinks', () => {
+  describe('getBacklinksByPath (new structure)', () => {
     it('應該找到連結到指定筆記的其他筆記', async () => {
-      // 先寫入目標筆記
       vaultManager.writeNote('target.md', '# Target\n\n目標筆記');
       await vaultManager.sync();
       
-      // 再寫入連結筆記（此時 target 已在資料庫中）
       vaultManager.writeNote('link1.md', '# Link1\n\n連結到 [[target]]');
       vaultManager.writeNote('link2.md', '# Link2\n\n連結到 [[target]]');
       await vaultManager.sync();
       
-      const targetNote = vaultManager.getNoteByPath('target.md');
-      const backlinks = vaultManager.getBacklinks(targetNote!.id);
+      const backlinks = vaultManager.getBacklinksByPath('target.md');
       
       expect(backlinks.length).toBe(2);
-      expect(backlinks.some(n => n.title === 'Link1')).toBe(true);
-      expect(backlinks.some(n => n.title === 'Link2')).toBe(true);
+      expect(backlinks.some(f => f.basename === 'link1')).toBe(true);
+      expect(backlinks.some(f => f.basename === 'link2')).toBe(true);
     });
   });
 
-  describe('getOrphans', () => {
+  describe('getOrphanFiles (new structure)', () => {
     it('應該找到沒有被連結的筆記', async () => {
       vaultManager.writeNote('linked.md', '# Linked\n\n連結到 [[other]]');
       vaultManager.writeNote('other.md', '# Other\n\n被連結');
@@ -216,10 +213,10 @@ describe('VaultManager', () => {
       
       await vaultManager.sync();
       
-      const orphans = vaultManager.getOrphans();
+      const orphans = vaultManager.getOrphanFiles();
       
-      expect(orphans.some(n => n.title === 'Orphan')).toBe(true);
-      expect(orphans.some(n => n.title === 'Linked')).toBe(false);
+      expect(orphans.some(f => f.basename === 'orphan')).toBe(true);
+      expect(orphans.some(f => f.basename === 'linked')).toBe(false);
     });
   });
 

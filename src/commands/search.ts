@@ -4,8 +4,8 @@ import { VaultManager } from '../utils/vault.js';
 
 export function createSearchCommand(): Command {
   const command = new Command('search')
-    .description('Search notes')
-    .argument('<query>', 'Search query')
+    .description('Search notes by path/basename and tags')
+    .argument('<query>', 'Search query (matches path and basename)')
     .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
     .option('-l, --limit <limit>', 'Maximum results', '20')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
@@ -24,33 +24,27 @@ export function createSearchCommand(): Command {
         const tags = options.tags ? options.tags.split(',').map((t: string) => t.trim()) : undefined;
         const limit = parseInt(options.limit);
 
-        const notes = vault.searchNotes(query, tags, limit);
+        const results = vault.searchFiles(query, tags, limit);
 
         if (options.format === 'json') {
-          const results = notes.map(note => ({
-            id: note.id,
-            title: note.title,
-            path: note.path,
-            excerpt: note.content.substring(0, 200) + (note.content.length > 200 ? '...' : ''),
-            tags: note.tags,
-            linksCount: note.links.length,
-            backlinksCount: note.backlinks.length
+          const output = results.map(({ file, tags: fileTags }) => ({
+            path: file.path,
+            basename: file.basename,
+            tags: fileTags
           }));
 
           console.log(JSON.stringify({
             query,
             filters: { tags, limit },
-            results,
-            total: results.length
+            results: output,
+            total: output.length
           }, null, 2));
         } else {
-          // Text format
           console.log(`Search results for "${query}":\n`);
-          notes.forEach((note, i) => {
-            console.log(`${i + 1}. ${note.title}`);
-            console.log(`   Path: ${note.path}`);
-            console.log(`   Tags: ${note.tags.join(', ') || 'none'}`);
-            console.log(`   ID: ${note.id}`);
+          results.forEach(({ file, tags: fileTags }, i) => {
+            console.log(`${i + 1}. ${file.basename}`);
+            console.log(`   Path: ${file.path}`);
+            console.log(`   Tags: ${fileTags.join(', ') || 'none'}`);
             console.log();
           });
         }
