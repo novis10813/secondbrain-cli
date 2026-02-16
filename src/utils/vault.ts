@@ -361,6 +361,26 @@ export class VaultManager {
   }
 
   /**
+   * Read file content by FileInfo (Obsidian-style API).
+   * Equivalent to Obsidian's Vault.read(file).
+   * @param file FileInfo object
+   * @returns File content or null if not found
+   */
+  readFile(file: FileInfo): string | null {
+    return this.readNote(file.path);
+  }
+
+  /**
+   * Get backlinks for a file by FileInfo (Obsidian-style API).
+   * Equivalent to Obsidian's MetadataCache.getBacklinksForFile(file).
+   * @param file FileInfo object
+   * @returns Array of FileInfo that link to this file
+   */
+  getBacklinksForFile(file: FileInfo): FileInfo[] {
+    return this.getBacklinksByPath(file.path);
+  }
+
+  /**
    * Get ContentMetadata for a FileInfo (Obsidian-style API).
    * Equivalent to Obsidian's MetadataCache.getFileCache(file).
    * @param file FileInfo object

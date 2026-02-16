@@ -464,6 +464,49 @@ describe('VaultManager', () => {
       });
     });
 
+    describe('readFile', () => {
+      it('should return file content for FileInfo', () => {
+        const file = vaultManager.getFileByPath('simple.md');
+        expect(file).not.toBeNull();
+        const content = vaultManager.readFile(file!);
+        expect(content).toBe('# Simple Note\n\nContent');
+      });
+
+      it('should return null when file does not exist on disk', () => {
+        const file: FileInfo = {
+          path: 'nonexistent.md',
+          name: 'nonexistent.md',
+          basename: 'nonexistent',
+          extension: 'md',
+          parent: null,
+          stat: { ctime: 0, mtime: 0, size: 0 }
+        };
+        expect(vaultManager.readFile(file)).toBeNull();
+      });
+    });
+
+    describe('getBacklinksForFile', () => {
+      it('should return FileInfo[] of files that link to the given file', async () => {
+        vaultManager.writeNote('backlink-a.md', '# A\n\n[[simple]]');
+        vaultManager.writeNote('backlink-b.md', '# B\n\n[[simple]]');
+        await vaultManager.sync();
+
+        const file = vaultManager.getFileByPath('simple.md');
+        expect(file).not.toBeNull();
+        const backlinks = vaultManager.getBacklinksForFile(file!);
+        expect(backlinks.length).toBe(2);
+        const paths = backlinks.map(f => f.path).sort();
+        expect(paths).toEqual(['backlink-a.md', 'backlink-b.md']);
+      });
+
+      it('should return empty array when file has no backlinks', () => {
+        const file = vaultManager.getFileByPath('with-heading.md');
+        expect(file).not.toBeNull();
+        const backlinks = vaultManager.getBacklinksForFile(file!);
+        expect(backlinks).toEqual([]);
+      });
+    });
+
     describe('getFileCache', () => {
       it('should return ContentMetadata for FileInfo', () => {
         const file = vaultManager.getFileByPath('simple.md');
