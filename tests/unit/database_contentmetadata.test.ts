@@ -261,6 +261,79 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     db.close();
   }, 15000);
 
+  it('should upsert and retrieve ContentMetadata with sections', () => {
+    const db = new DatabaseManager(config);
+    const file = createTestFile('test/note.md');
+    db.upsertFile(file, 'hash123');
+
+    const metadata: ContentMetadata = {
+      sections: [
+        {
+          id: 'frontmatter',
+          type: 'frontmatter',
+          position: {
+            start: { line: 0, col: 0, offset: 0 },
+            end: { line: 3, col: 3, offset: 25 }
+          }
+        },
+        {
+          id: '0',
+          type: 'heading',
+          position: {
+            start: { line: 4, col: 0, offset: 26 },
+            end: { line: 10, col: 0, offset: 80 }
+          }
+        }
+      ]
+    };
+
+    db.upsertContentMetadata('test/note.md', metadata, 'hash123');
+    const retrieved = db.getContentMetadata('test/note.md');
+
+    expect(retrieved?.sections).toHaveLength(2);
+    expect(retrieved?.sections?.[0].id).toBe('frontmatter');
+    expect(retrieved?.sections?.[0].type).toBe('frontmatter');
+    expect(retrieved?.sections?.[1].id).toBe('0');
+    expect(retrieved?.sections?.[1].type).toBe('heading');
+    expect(retrieved?.sections?.[1].position.start.line).toBe(4);
+    expect(retrieved?.sections?.[1].position.end.offset).toBe(80);
+
+    db.close();
+  }, 15000);
+
+  it('getSectionsForFile returns sections for file', () => {
+    const db = new DatabaseManager(config);
+    const file = createTestFile('test/note.md');
+    db.upsertFile(file, 'hash123');
+
+    const metadata: ContentMetadata = {
+      sections: [
+        {
+          id: '0',
+          type: 'content',
+          position: {
+            start: { line: 0, col: 0, offset: 0 },
+            end: { line: 5, col: 0, offset: 50 }
+          }
+        }
+      ]
+    };
+
+    db.upsertContentMetadata('test/note.md', metadata, 'hash123');
+    const sections = db.getSectionsForFile('test/note.md');
+
+    expect(sections).toHaveLength(1);
+    expect(sections[0].id).toBe('0');
+    expect(sections[0].type).toBe('content');
+  }, 15000);
+
+  it('getSectionsForFile returns empty array for non-existent file', () => {
+    const db = new DatabaseManager(config);
+    const sections = db.getSectionsForFile('nonexistent.md');
+    expect(sections).toEqual([]);
+    db.close();
+  }, 15000);
+
   it('should return null for non-existent ContentMetadata', () => {
     const db = new DatabaseManager(config);
     const retrieved = db.getContentMetadata('nonexistent.md');

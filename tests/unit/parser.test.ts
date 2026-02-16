@@ -355,6 +355,73 @@ Just regular text`;
       });
     });
 
+    describe('buildSections', () => {
+      it('builds frontmatter section and one section per heading', () => {
+        const content = `---
+title: Test
+---
+
+# First
+
+Intro.
+
+## Second
+
+More.`;
+
+        const parsed = NoteParser.parse(content);
+        const sections = NoteParser.buildSections(parsed, content);
+
+        expect(sections).toHaveLength(3);
+        expect(sections[0].id).toBe('frontmatter');
+        expect(sections[0].type).toBe('frontmatter');
+        expect(sections[0].position.start.offset).toBe(0);
+        expect(sections[1].id).toBe('0');
+        expect(sections[1].type).toBe('heading');
+        expect(sections[2].id).toBe('1');
+        expect(sections[2].type).toBe('heading');
+      });
+
+      it('builds single content section when no headings', () => {
+        const content = `---
+tags: [a]
+---
+
+Body only.`;
+
+        const parsed = NoteParser.parse(content);
+        const sections = NoteParser.buildSections(parsed, content);
+
+        expect(sections).toHaveLength(2);
+        expect(sections[0].id).toBe('frontmatter');
+        expect(sections[0].type).toBe('frontmatter');
+        expect(sections[1].id).toBe('0');
+        expect(sections[1].type).toBe('content');
+        expect(sections[1].position.start.offset).toBeGreaterThan(0);
+        expect(sections[1].position.end.offset).toBe(content.length);
+      });
+
+      it('builds heading sections only when no frontmatter', () => {
+        const content = `# One
+
+Text.
+
+## Two
+
+More.`;
+
+        const parsed = NoteParser.parse(content);
+        const sections = NoteParser.buildSections(parsed, content);
+
+        expect(sections).toHaveLength(2);
+        expect(sections[0].id).toBe('0');
+        expect(sections[0].type).toBe('heading');
+        expect(sections[1].id).toBe('1');
+        expect(sections[1].type).toBe('heading');
+        expect(sections[1].position.end.offset).toBe(content.length);
+      });
+    });
+
     it('extracts block references ^block-id from body', () => {
       const content = `# Doc
 
@@ -1147,6 +1214,28 @@ Link [[page|Display Label]].`;
       expect(meta.links).toHaveLength(1);
       expect(meta.links![0].displayText).toBe('Display Label');
       expect(meta.links![0].original).toBe('[[page|Display Label]]');
+    });
+
+    it('includes sections when originalContent is provided', () => {
+      const content = `# Title
+
+Body.`;
+      const parsed = NoteParser.parse(content);
+      const meta = NoteParser.parsedToContentMetadata(parsed, content);
+
+      expect(meta.sections).toBeDefined();
+      expect(meta.sections!.length).toBeGreaterThanOrEqual(1);
+      expect(meta.sections!.some(s => s.type === 'heading' && s.id === '0')).toBe(true);
+    });
+
+    it('omits sections when originalContent is not provided', () => {
+      const content = `# Title
+
+Body.`;
+      const parsed = NoteParser.parse(content);
+      const meta = NoteParser.parsedToContentMetadata(parsed);
+
+      expect(meta.sections).toBeUndefined();
     });
   });
 });

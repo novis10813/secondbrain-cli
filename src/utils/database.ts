@@ -212,6 +212,23 @@ export class DatabaseManager {
       )
     `);
 
+    // Sections table (document sections: frontmatter, heading-bounded regions)
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS sections_with_positions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_path TEXT NOT NULL,
+        section_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        start_line INTEGER NOT NULL,
+        start_col INTEGER NOT NULL,
+        start_offset INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        end_col INTEGER NOT NULL,
+        end_offset INTEGER NOT NULL,
+        FOREIGN KEY (file_path) REFERENCES files(path) ON DELETE CASCADE
+      )
+    `);
+
     // Create indexes for new tables
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
@@ -222,6 +239,7 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_headings_pos_file ON headings_with_positions(file_path);
       CREATE INDEX IF NOT EXISTS idx_blocks_pos_file ON blocks_with_positions(file_path);
       CREATE INDEX IF NOT EXISTS idx_embeds_pos_file ON embeds_with_positions(file_path);
+      CREATE INDEX IF NOT EXISTS idx_sections_pos_file ON sections_with_positions(file_path);
     `);
   }
 
@@ -513,6 +531,7 @@ export class DatabaseManager {
     const deleteHeadingsStmt = this.db.prepare('DELETE FROM headings_with_positions WHERE file_path = ?');
     const deleteBlocksStmt = this.db.prepare('DELETE FROM blocks_with_positions WHERE file_path = ?');
     const deleteEmbedsStmt = this.db.prepare('DELETE FROM embeds_with_positions WHERE file_path = ?');
+    const deleteSectionsStmt = this.db.prepare('DELETE FROM sections_with_positions WHERE file_path = ?');
 
     // Use transaction for atomicity
     const transaction = this.db.transaction(() => {
@@ -534,6 +553,7 @@ export class DatabaseManager {
       deleteHeadingsStmt.run(filePath);
       deleteBlocksStmt.run(filePath);
       deleteEmbedsStmt.run(filePath);
+      deleteSectionsStmt.run(filePath);
 
       // Prepare INSERT statements inside transaction
       const linkStmt = this.db.prepare(`
@@ -579,6 +599,15 @@ export class DatabaseManager {
           end_line, end_col, end_offset
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      const sectionStmt = this.db.prepare(`
+        INSERT INTO sections_with_positions (
+          file_path, section_id, type,
+          start_line, start_col, start_offset,
+          end_line, end_col, end_offset
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
 
       // Insert links
@@ -663,6 +692,23 @@ export class DatabaseManager {
             embed.position.end.line,
             embed.position.end.col,
             embed.position.end.offset
+          );
+        }
+      }
+
+      // Insert sections
+      if (metadata.sections && metadata.sections.length > 0) {
+        for (const section of metadata.sections) {
+          sectionStmt.run(
+            filePath,
+            section.id,
+            section.type,
+            section.position.start.line,
+            section.position.start.col,
+            section.position.start.offset,
+            section.position.end.line,
+            section.position.end.col,
+            section.position.end.offset
           );
         }
       }
@@ -804,7 +850,36 @@ export class DatabaseManager {
       }));
     }
 
+    // Sections
+    const sectionRows = this.db.prepare('SELECT * FROM sections_with_positions WHERE file_path = ?').all(filePath) as any[];
+    if (sectionRows.length > 0) {
+      result.sections = sectionRows.map(row => ({
+        id: row.section_id,
+        type: row.type,
+        position: {
+          start: {
+            line: row.start_line,
+            col: row.start_col,
+            offset: row.start_offset
+          },
+          end: {
+            line: row.end_line,
+            col: row.end_col,
+            offset: row.end_offset
+          }
+        }
+      }));
+    }
+
     return result;
+  }
+
+  /**
+   * Get sections for a file (section-level query). Returns empty array if file has no metadata.
+   */
+  getSectionsForFile(filePath: string): ContentMetadata['sections'] {
+    const meta = this.getContentMetadata(filePath);
+    return meta?.sections ?? [];
   }
 
   // Batch operations

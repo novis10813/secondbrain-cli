@@ -12,7 +12,8 @@ import type {
 	BlockCache,
 	FrontMatterCache,
 	FootnoteCache,
-	FootnoteRefCache
+	FootnoteRefCache,
+	SectionCache
 } from '../types/index.js';
 import { rangeToPos } from './position.js';
 
@@ -601,6 +602,47 @@ export class NoteParser {
     }));
   }
 
+  /**
+   * Build document sections from parsed note (Obsidian-aligned).
+   * Sections: frontmatter (if present), then one section per heading from that heading to the next
+   * (or end of file). With no headings, a single content section from body start to EOF.
+   */
+  static buildSections(parsed: ParsedNote, fullContent: string): SectionCache[] {
+    const sections: SectionCache[] = [];
+    const bodyStartOffset =
+      parsed.frontmatterPosition != null ? parsed.frontmatterPosition.end.offset + 1 : 0;
+
+    if (parsed.frontmatterPosition != null) {
+      sections.push({
+        id: 'frontmatter',
+        type: 'frontmatter',
+        position: parsed.frontmatterPosition
+      });
+    }
+
+    const headings = parsed.headings;
+    if (headings.length === 0) {
+      sections.push({
+        id: '0',
+        type: 'content',
+        position: rangeToPos(fullContent, bodyStartOffset, fullContent.length)
+      });
+      return sections;
+    }
+
+    for (let i = 0; i < headings.length; i++) {
+      const startOffset = headings[i].position.start.offset;
+      const endOffset =
+        i + 1 < headings.length ? headings[i + 1].position.start.offset : fullContent.length;
+      sections.push({
+        id: String(i),
+        type: 'heading',
+        position: rangeToPos(fullContent, startOffset, endOffset)
+      });
+    }
+    return sections;
+  }
+
 	/**
 	 * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
 	 * Preserves task status and position information.
@@ -731,6 +773,11 @@ export class NoteParser {
 					position: ref.position
 				})
 			);
+		}
+
+		// Sections (from headings + frontmatter); require full content for correct positions
+		if (originalContent != null) {
+			metadata.sections = this.buildSections(parsed, originalContent);
 		}
 
 		return metadata;
