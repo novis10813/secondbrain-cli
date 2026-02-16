@@ -56,8 +56,8 @@ export class DatabaseManager {
     const stmt = this.db.prepare(`
       INSERT INTO notes (id, path, title, content, frontmatter, tags, hash, created_at, modified_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        path = excluded.path,
+      ON CONFLICT(path) DO UPDATE SET
+        id = excluded.id,
         title = excluded.title,
         content = excluded.content,
         frontmatter = excluded.frontmatter,
@@ -109,6 +109,12 @@ export class DatabaseManager {
     return this.rowToNote(row);
   }
 
+  getNoteByTitle(title: string): Note | null {
+    const row = this.db.prepare('SELECT * FROM notes WHERE title = ? COLLATE NOCASE').get(title);
+    if (!row) return null;
+    return this.rowToNote(row);
+  }
+
   searchNotes(query: string, tags?: string[], limit: number = 20): Note[] {
     let sql = 'SELECT * FROM notes WHERE (title LIKE ? OR content LIKE ?)';
     const params: (string | number)[] = [`%${query}%`, `%${query}%`];
@@ -122,7 +128,7 @@ export class DatabaseManager {
     params.push(limit);
 
     const rows = this.db.prepare(sql).all(...params);
-    return rows.map((row: any) => this.rowToNote(row));
+    return this.rowsToNotes(rows as any[]);
   }
 
   getBacklinks(noteId: string): Note[] {
@@ -132,7 +138,7 @@ export class DatabaseManager {
       WHERE l.target_id = ?
     `;
     const rows = this.db.prepare(sql).all(noteId);
-    return rows.map((row: any) => this.rowToNote(row));
+    return this.rowsToNotes(rows as any[]);
   }
 
   getOrphans(): Note[] {
@@ -143,12 +149,12 @@ export class DatabaseManager {
       WHERE l1.source_id IS NULL AND l2.target_id IS NULL
     `;
     const rows = this.db.prepare(sql).all();
-    return rows.map((row: any) => this.rowToNote(row));
+    return this.rowsToNotes(rows as any[]);
   }
 
   getAllNotes(): Note[] {
     const rows = this.db.prepare('SELECT * FROM notes').all();
-    return rows.map((row: any) => this.rowToNote(row));
+    return this.rowsToNotes(rows as any[]);
   }
 
   deleteNoteByPath(path: string): void {
@@ -198,5 +204,79 @@ export class DatabaseManager {
       createdAt: row.created_at,
       modifiedAt: row.modified_at
     };
+  }
+
+  private getNotesWithLinksBatch(noteIds: string[]): Map<string, { links: string[], backlinks: string[] }> {
+    if (noteIds.length === 0) return new Map();
+    
+    const placeholders = noteIds.map(() => '?').join(',');
+    
+    // Single query to get all links for all notes
+    const linksSql = `
+      SELECT source_id, json_group_array(target_id) as targets
+      FROM links
+      WHERE source_id IN (${placeholders})
+      GROUP BY source_id
+    `;
+    
+    const backlinksSql = `
+      SELECT target_id, json_group_array(source_id) as sources
+      FROM links
+      WHERE target_id IN (${placeholders})
+      GROUP BY target_id
+    `;
+    
+    const result = new Map<string, { links: string[], backlinks: string[] }>();
+    
+    // Initialize with empty arrays
+    for (const id of noteIds) {
+      result.set(id, { links: [], backlinks: [] });
+    }
+    
+    // Populate links
+    const linksRows = this.db.prepare(linksSql).all(...noteIds) as any[];
+    for (const row of linksRows) {
+      const targets = JSON.parse(row.targets);
+      result.get(row.source_id)!.links = targets;
+    }
+    
+    // Populate backlinks
+    const backlinksRows = this.db.prepare(backlinksSql).all(...noteIds) as any[];
+    for (const row of backlinksRows) {
+      const sources = JSON.parse(row.sources);
+      result.get(row.target_id)!.backlinks = sources;
+    }
+    
+    return result;
+  }
+
+  private rowsToNotes(rows: any[]): Note[] {
+    if (rows.length === 0) return [];
+    
+    // Extract all note IDs
+    const noteIds = rows.map(row => row.id);
+    
+    // Batch load all links and backlinks in 2 queries
+    const linkData = this.getNotesWithLinksBatch(noteIds);
+    
+    // Map rows to notes using batched link data
+    return rows.map(row => {
+      const links = linkData.get(row.id)?.links || [];
+      const backlinks = linkData.get(row.id)?.backlinks || [];
+      
+      return {
+        id: row.id,
+        path: row.path,
+        title: row.title,
+        content: row.content,
+        frontmatter: JSON.parse(row.frontmatter),
+        tags: JSON.parse(row.tags),
+        links,
+        backlinks,
+        hash: row.hash,
+        createdAt: row.created_at,
+        modifiedAt: row.modified_at,
+      };
+    });
   }
 }
