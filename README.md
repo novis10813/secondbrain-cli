@@ -13,11 +13,7 @@
 ## 安裝
 
 ```bash
-# GitHub Packages（需要 GitHub Token 權限：read:packages）
-# 先登入 GitHub Packages registry（會寫入你的 ~/.npmrc）
-npm login --scope=@novis10813 --registry=https://npm.pkg.github.com
-
-# 全域安裝
+# npm registry（公開套件）
 npm install -g @novis10813/secondbrain-cli
 ```
 
@@ -122,16 +118,16 @@ bun test
 
 MIT
 
-## 發佈（GitHub Packages）
+## 發佈（npm registry）
 
 1) 建立 GitHub Personal Access Token（classic 或 fine-grained 皆可）
 
 - **最低需要**: `write:packages`（發佈）、`read:packages`（安裝）
 - 如果 repo 是 private，通常也需要能讀取 repo 的權限（依你的帳號/組織設定而定）
 
-2) 登入 registry 並發佈
+2) 登入 npm registry 並發佈
 
 ```bash
-npm login --scope=@novis10813 --registry=https://npm.pkg.github.com
-npm publish
+npm login
+npm publish --access public
 ```
