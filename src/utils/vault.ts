@@ -292,4 +292,85 @@ export class VaultManager {
   upsertNote(note: Note): void {
     return this.db.upsertNote(note);
   }
+
+  // Obsidian-style API methods
+
+  /**
+   * Get FileInfo by path (Obsidian-style API).
+   * @param path Relative path from vault root
+   * @returns FileInfo or null if not found
+   */
+  getFileByPath(path: string): FileInfo | null {
+    return this.db.getFileByPath(path);
+  }
+
+  /**
+   * Get ContentMetadata for a FileInfo (Obsidian-style API).
+   * Equivalent to Obsidian's MetadataCache.getFileCache(file).
+   * @param file FileInfo object
+   * @returns ContentMetadata or null if not found
+   */
+  getFileCache(file: FileInfo): ContentMetadata | null {
+    return this.db.getContentMetadata(file.path);
+  }
+
+  /**
+   * Resolve a linkpath to a FileInfo (Obsidian-style API).
+   * Equivalent to Obsidian's MetadataCache.getFirstLinkpathDest(linkpath, sourcePath).
+   * Resolves linkpaths like "note-name", "folder/note-name", "note-name#heading", etc.
+   * @param linkpath Link path (may include heading/block reference after #)
+   * @param sourcePath Path of the source file (for relative path resolution)
+   * @returns FileInfo or null if not found
+   */
+  getFirstLinkpathDest(linkpath: string, sourcePath: string): FileInfo | null {
+    // Strip heading/block reference (everything after #)
+    const filePart = linkpath.split('#')[0].trim();
+    if (!filePart) return null;
+
+    // Try exact path match first
+    let file = this.db.getFileByPath(filePart);
+    if (file) return file;
+
+    // Try with .md extension
+    file = this.db.getFileByPath(filePart + '.md');
+    if (file) return file;
+
+    // Try relative to source file's directory
+    if (sourcePath) {
+      const sourceDir = dirname(sourcePath);
+      const relativePath = sourceDir === '.' ? filePart : join(sourceDir, filePart);
+      file = this.db.getFileByPath(relativePath);
+      if (file) return file;
+
+      // Try relative path with .md extension
+      file = this.db.getFileByPath(relativePath + '.md');
+      if (file) return file;
+    }
+
+    // Try path variations (spaces to dashes/underscores)
+    const variations = [
+      filePart.replace(/ /g, '-') + '.md',
+      filePart.replace(/ /g, '_') + '.md',
+      filePart.replace(/ /g, '-'),
+      filePart.replace(/ /g, '_')
+    ];
+
+    for (const variation of variations) {
+      file = this.db.getFileByPath(variation);
+      if (file) return file;
+    }
+
+    // Try finding by basename (filename without extension)
+    // This matches Obsidian's behavior of finding files by title
+    const allFiles = this.db.getAllFiles();
+    const basenameToMatch = filePart.replace(/\.md$/, '').toLowerCase();
+    
+    for (const candidate of allFiles) {
+      if (candidate.basename.toLowerCase() === basenameToMatch) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
 }

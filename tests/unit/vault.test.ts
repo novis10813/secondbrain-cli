@@ -311,4 +311,166 @@ describe('VaultManager', () => {
       expect(contentMetadata?.frontmatter?.position.start.line).toBeGreaterThanOrEqual(0);
     });
   });
+
+  describe('Obsidian-style API methods', () => {
+    beforeEach(async () => {
+      // Set up test files
+      vaultManager.writeNote('simple.md', '# Simple Note\n\nContent');
+      vaultManager.writeNote('folder/nested.md', '# Nested Note\n\nNested content');
+      vaultManager.writeNote('with-heading.md', '# Main\n\n## Section\n\nContent');
+      vaultManager.writeNote('note with spaces.md', '# Note With Spaces\n\nContent');
+      await vaultManager.sync();
+    });
+
+    describe('getFileByPath', () => {
+      it('should return FileInfo for existing file', () => {
+        const file = vaultManager.getFileByPath('simple.md');
+        
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('simple.md');
+        expect(file?.name).toBe('simple.md');
+        expect(file?.basename).toBe('simple');
+        expect(file?.extension).toBe('md');
+        expect(file?.stat).toBeDefined();
+      });
+
+      it('should return null for non-existent file', () => {
+        const file = vaultManager.getFileByPath('nonexistent.md');
+        expect(file).toBeNull();
+      });
+
+      it('should return FileInfo for nested file', () => {
+        const file = vaultManager.getFileByPath('folder/nested.md');
+        
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('folder/nested.md');
+        expect(file?.parent).toBe('folder');
+      });
+    });
+
+    describe('getFileCache', () => {
+      it('should return ContentMetadata for FileInfo', () => {
+        const file = vaultManager.getFileByPath('simple.md');
+        expect(file).not.toBeNull();
+        
+        const cache = vaultManager.getFileCache(file!);
+        
+        expect(cache).not.toBeNull();
+        expect(cache?.headings).toBeDefined();
+        expect(cache?.headings?.length).toBeGreaterThan(0);
+        expect(cache?.headings?.[0].heading).toBe('Simple Note');
+      });
+
+      it('should return null for non-existent file', () => {
+        const file: FileInfo = {
+          path: 'nonexistent.md',
+          name: 'nonexistent.md',
+          basename: 'nonexistent',
+          extension: 'md',
+          parent: null,
+          stat: { ctime: 0, mtime: 0, size: 0 }
+        };
+        
+        const cache = vaultManager.getFileCache(file);
+        expect(cache).toBeNull();
+      });
+
+      it('should return ContentMetadata with links and tags', async () => {
+        vaultManager.writeNote('linked.md', '# Linked\n\n[[simple]] and #tag');
+        await vaultManager.sync();
+        
+        const file = vaultManager.getFileByPath('linked.md');
+        expect(file).not.toBeNull();
+        
+        const cache = vaultManager.getFileCache(file!);
+        
+        expect(cache).not.toBeNull();
+        expect(cache?.links).toBeDefined();
+        expect(cache?.links?.length).toBeGreaterThan(0);
+        expect(cache?.tags).toBeDefined();
+        expect(cache?.tags?.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe('getFirstLinkpathDest', () => {
+      it('should resolve simple filename', () => {
+        const dest = vaultManager.getFirstLinkpathDest('simple', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('simple.md');
+        expect(dest?.basename).toBe('simple');
+      });
+
+      it('should resolve filename with extension', () => {
+        const dest = vaultManager.getFirstLinkpathDest('simple.md', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('simple.md');
+      });
+
+      it('should resolve nested path', () => {
+        const dest = vaultManager.getFirstLinkpathDest('folder/nested', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('folder/nested.md');
+      });
+
+      it('should strip heading reference', () => {
+        const dest = vaultManager.getFirstLinkpathDest('simple#heading', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('simple.md');
+      });
+
+      it('should strip block reference', () => {
+        const dest = vaultManager.getFirstLinkpathDest('simple#^block-id', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('simple.md');
+      });
+
+      it('should resolve relative to source path', async () => {
+        vaultManager.writeNote('folder/source.md', '# Source');
+        vaultManager.writeNote('folder/target.md', '# Target');
+        await vaultManager.sync();
+        
+        const dest = vaultManager.getFirstLinkpathDest('target', 'folder/source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('folder/target.md');
+      });
+
+      it('should resolve filename with spaces (dash variation)', () => {
+        const dest = vaultManager.getFirstLinkpathDest('note with spaces', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.path).toBe('note with spaces.md');
+      });
+
+      it('should resolve by basename match', () => {
+        const dest = vaultManager.getFirstLinkpathDest('simple', 'source.md');
+        
+        expect(dest).not.toBeNull();
+        expect(dest?.basename).toBe('simple');
+      });
+
+      it('should return null for non-existent linkpath', () => {
+        const dest = vaultManager.getFirstLinkpathDest('nonexistent', 'source.md');
+        
+        expect(dest).toBeNull();
+      });
+
+      it('should return null for empty linkpath', () => {
+        const dest = vaultManager.getFirstLinkpathDest('', 'source.md');
+        
+        expect(dest).toBeNull();
+      });
+
+      it('should handle linkpath with only heading reference', () => {
+        const dest = vaultManager.getFirstLinkpathDest('#heading', 'source.md');
+        
+        expect(dest).toBeNull();
+      });
+    });
+  });
 });
