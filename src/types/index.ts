@@ -35,6 +35,99 @@ export interface EmbedRef {
   column: number;
 }
 
+/** Obsidian-aligned position types (CachedMetadata). */
+
+/** Location: line (0-based), column, and character offset from file start. */
+export interface Loc {
+  line: number;
+  col: number;
+  offset: number;
+}
+
+/** Span: start and end location. */
+export interface Pos {
+  start: Loc;
+  end: Loc;
+}
+
+/** Base for cache items that have a position. */
+export interface CacheItem {
+  position: Pos;
+}
+
+/** Base for link-like caches (wikilinks, embeds). */
+export interface ReferenceCache extends CacheItem {
+  link: string;
+  original: string;
+  displayText?: string;
+}
+
+/** Wikilink [[target]] or [[target|display]]. */
+export interface LinkCache extends ReferenceCache {}
+
+/** Embed ![[path]] or ![[path|display]]. */
+export interface EmbedCache extends ReferenceCache {}
+
+/** Tag #tag (tag is the name without #). */
+export interface TagCache extends CacheItem {
+  tag: string;
+}
+
+/** Heading H1–H6. */
+export interface HeadingCache extends CacheItem {
+  heading: string;
+  level: number;
+}
+
+/** Block for ^block-id references. */
+export interface BlockCache extends CacheItem {
+  id: string;
+}
+
+/** Frontmatter position in file. */
+export interface FrontMatterCache {
+  position: Pos;
+}
+
+/** Footnote definition. */
+export interface FootnoteCache extends CacheItem {
+  id: string;
+  content: string;
+}
+
+/** Footnote reference in text. */
+export interface FootnoteRefCache extends CacheItem {
+  id: string;
+}
+
+/** Document section (e.g. frontmatter, content). */
+export interface SectionCache extends CacheItem {
+  id: string;
+  type: string;
+}
+
+/** List item with optional task state. */
+export interface ListItemCache extends CacheItem {
+  task?: string;
+}
+
+/**
+ * Content-derived metadata matching Obsidian's CachedMetadata.
+ * Returned by MetadataCache.getFileCache(file). All fields optional.
+ */
+export interface ContentMetadata {
+  links?: LinkCache[];
+  embeds?: EmbedCache[];
+  tags?: TagCache[];
+  headings?: HeadingCache[];
+  footnotes?: FootnoteCache[];
+  footnoteRefs?: FootnoteRefCache[];
+  blocks?: BlockCache[];
+  frontmatter?: FrontMatterCache;
+  sections?: SectionCache[];
+  listItems?: ListItemCache[];
+}
+
 /** Heading with position (H1–H6). */
 export interface HeadingRef {
   level: number;
