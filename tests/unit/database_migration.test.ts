@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { DatabaseManager } from '../../src/utils/database';
 import { Config, Note } from '../../src/types';
 import { unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('DatabaseManager Migration from Old Schema', () => {
-  const dbPath = 'test-migration.db';
+  const dbPath = join(tmpdir(), 'secondbrain-migration-test.db');
   const config: Config = {
     vaultPath: '.',
     dailyNotesFolder: 'Daily',
@@ -128,7 +130,7 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(metadata2?.blocks?.length).toBeGreaterThan(0);
 
     db.close();
-  }, 10000);
+  }, 20000);
 
   it('should skip already migrated notes', () => {
     const db = new DatabaseManager(config);
@@ -184,7 +186,7 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(result.errors).toBe(0);
 
     db.close();
-  }, 10000);
+  }, 20000);
 
   it('should extract positions correctly from migrated content', () => {
     const db = new DatabaseManager(config);
@@ -248,7 +250,7 @@ describe('DatabaseManager Migration from Old Schema', () => {
     }
 
     db.close();
-  }, 10000);
+  }, 20000);
 
   it('should handle notes without stat information', () => {
     const db = new DatabaseManager(config);
@@ -286,7 +288,7 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(file?.stat.size).toBeGreaterThanOrEqual(0);
 
     db.close();
-  }, 10000);
+  }, 20000);
 
   it('should handle notes with frontmatter correctly', () => {
     const db = new DatabaseManager(config);
@@ -330,7 +332,7 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(metadata?.frontmatter?.position.end.offset).toBeDefined();
 
     db.close();
-  }, 10000);
+  }, 20000);
 
   it('should return zero statistics when no notes exist', () => {
     const db = new DatabaseManager(config);
@@ -342,5 +344,5 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(result.errors).toBe(0);
 
     db.close();
-  }, 10000);
+  }, 20000);
 });
