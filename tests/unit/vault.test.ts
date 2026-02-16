@@ -151,16 +151,16 @@ describe('VaultManager', () => {
     });
 
     it('應該解析筆記連結', async () => {
-      // 先寫入目標筆記
       vaultManager.writeNote('target.md', '# Target\n\n內容');
       await vaultManager.sync();
-      
-      // 再寫入來源筆記（此時 target 已在資料庫中）
+
       vaultManager.writeNote('source.md', '# Source\n\n連結到 [[target]]');
       await vaultManager.sync();
-      
-      const sourceNote = vaultManager.getNoteByPath('source.md');
-      expect(sourceNote?.links.length).toBeGreaterThan(0);
+
+      // New structure: links are in links_with_positions; verify via backlinks
+      const backlinks = vaultManager.getBacklinksByPath('target.md');
+      expect(backlinks.length).toBeGreaterThan(0);
+      expect(backlinks.some(b => b.path === 'source.md')).toBe(true);
     });
 
     it('應該解析並追蹤 block references', async () => {
@@ -299,6 +299,22 @@ describe('VaultManager', () => {
       expect(graph.nodes.length).toBe(2);
       expect(graph.nodes.every(n => 'id' in n && 'title' in n && 'path' in n && 'tags' in n)).toBe(true);
       expect(graph.edges.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('uses new structure: node id is path, edges use paths', async () => {
+      vaultManager.writeNote('from.md', '# From\n\nLink to [[to]]');
+      vaultManager.writeNote('to.md', '# To\n\nContent');
+      await vaultManager.sync();
+
+      const graph = vaultManager.getGraphData();
+      const fromNode = graph.nodes.find(n => n.path === 'from.md');
+      const toNode = graph.nodes.find(n => n.path === 'to.md');
+      expect(fromNode).toBeDefined();
+      expect(toNode).toBeDefined();
+      expect(fromNode?.id).toBe('from.md');
+      expect(toNode?.id).toBe('to.md');
+      const edge = graph.edges.find(e => e.source === 'from.md' && e.target === 'to.md');
+      expect(edge).toBeDefined();
     });
   });
 

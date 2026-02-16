@@ -60,14 +60,8 @@ export class VaultManager {
 				this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
 
 				// Also update notes table for backward compatibility
-				// Resolve links to note IDs for the Note object
+				// Link resolution uses new structure (getFirstLinkpathDest); graph uses links_with_positions
 				const linkIds: string[] = [];
-				for (const link of parsed.links) {
-					const linkedNote = this.findNoteByTitleOrPath(link.target);
-					if (linkedNote) {
-						linkIds.push(linkedNote.id);
-					}
-				}
 				const note = await this.createNoteFromFile(relativePath, content, hash, linkIds);
 				if (!isNew) {
 					// Preserve ID for updated notes
@@ -86,19 +80,16 @@ export class VaultManager {
 			}
 		}
 
-		// Pass 2: Resolve link targets against populated database
-		// Update links_with_positions table with resolved target_path and target_id
+		// Pass 2: Resolve link targets using new structure; update links_with_positions
 		for (const filePath of markdownFiles) {
 			const relativePath = relative(this.config.vaultPath, filePath);
 			const content = readFileSync(filePath, 'utf-8');
 			const parsed = NoteParser.parse(content);
-			
-			// Resolve each link target and update links_with_positions table
+
 			for (const link of parsed.links) {
-				const linkedNote = this.findNoteByTitleOrPath(link.target);
-				if (linkedNote) {
-					// Update link target in database
-					this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedNote.path, linkedNote.id);
+				const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
+				if (linkedFile) {
+					this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
 				}
 			}
 		}
@@ -204,31 +195,6 @@ export class VaultManager {
 			}
 		};
 	}
-
-  private findNoteByTitleOrPath(titleOrPath: string): Note | null {
-    // Try exact path match first
-    const note = this.db.getNoteByPath(titleOrPath + '.md');
-    if (note) return note;
-
-    // Try with different extensions or paths
-    const variations = [
-      titleOrPath + '.md',
-      titleOrPath,
-      titleOrPath.replace(/ /g, '-') + '.md',
-      titleOrPath.replace(/ /g, '_') + '.md'
-    ];
-
-    for (const variation of variations) {
-      const note = this.db.getNoteByPath(variation);
-      if (note) return note;
-    }
-
-    // Search by title using SQL (case-insensitive)
-    const byTitle = this.db.getNoteByTitle(titleOrPath);
-    if (byTitle) return byTitle;
-
-    return null;
-  }
 
   // Write note to file
   writeNote(path: string, content: string): void {

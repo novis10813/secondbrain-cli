@@ -1098,21 +1098,25 @@ export class DatabaseManager {
     return { totalNotes, totalLinks, orphans };
   }
 
+  /** Graph data from new structure (files + links_with_positions). */
   getGraphData(): GraphData {
-    const nodes = this.db.prepare('SELECT id, title, path, tags FROM notes').all();
-    const edges = this.db.prepare('SELECT source_id, target_id FROM links').all();
+    const fileRows = this.db.prepare(`
+      SELECT f.path, f.basename,
+        (SELECT group_concat(DISTINCT tag) FROM tags_with_positions WHERE file_path = f.path) AS tags_str
+      FROM files f
+    `).all() as { path: string; basename: string; tags_str: string | null }[];
+    const edgeRows = this.db.prepare(`
+      SELECT DISTINCT source_path, target_path FROM links_with_positions WHERE target_path IS NOT NULL
+    `).all() as { source_path: string; target_path: string }[];
 
     return {
-      nodes: nodes.map((n: any) => ({
-        id: n.id,
-        title: n.title,
+      nodes: fileRows.map(n => ({
+        id: n.path,
+        title: n.basename,
         path: n.path,
-        tags: JSON.parse(n.tags)
+        tags: n.tags_str ? n.tags_str.split(',') : []
       })),
-      edges: edges.map((e: any) => ({
-        source: e.source_id,
-        target: e.target_id
-      }))
+      edges: edgeRows.map(e => ({ source: e.source_path, target: e.target_path }))
     };
   }
 
