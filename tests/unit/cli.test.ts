@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { join } from 'path';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
 
 const PROJECT_ROOT = join(import.meta.dir, '..', '..');
 const CLI_ENTRY = join(PROJECT_ROOT, 'src', 'index.ts');
@@ -20,9 +21,12 @@ const EXPECTED_COMMANDS = [
 	'migrate',
 ];
 
-async function runCli(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+async function runCli(
+	args: string[],
+	cwd: string = PROJECT_ROOT
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
 	const proc = Bun.spawn([ 'bun', 'run', CLI_ENTRY, ...args ], {
-		cwd: PROJECT_ROOT,
+		cwd,
 		stdout: 'pipe',
 		stderr: 'pipe',
 	});
@@ -60,5 +64,75 @@ describe('CLI commands', () => {
 				`README should document 'sb ${cmd}'`
 			).toBe(true);
 		}
+	});
+});
+
+describe('CLI integration (init, sync, get, search)', () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = mkdtempSync(join(tmpdir(), 'sb-cli-int-'));
+	});
+
+	afterEach(() => {
+		rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	it('init creates .secondbrain and config', async () => {
+		const { exitCode, stdout, stderr } = await runCli([ 'init', '-p', tempDir ]);
+		expect(exitCode).toBe(0);
+		expect(stderr).toBe('');
+		expect(stdout).toContain('SecondBrain vault initialized');
+		expect(stdout).toContain('Vault path:');
+		expect(existsSync(join(tempDir, '.secondbrain', 'config.json'))).toBe(true);
+	});
+
+	it('sync indexes notes and get returns note content', async () => {
+		await runCli([ 'init', '-p', tempDir ]);
+		writeFileSync(join(tempDir, 'hello.md'), '# Hello\n\nWorld.', 'utf-8');
+
+		const syncResult = await runCli([ 'sync' ], tempDir);
+		expect(syncResult.exitCode).toBe(0);
+
+		const getResult = await runCli([ 'get', 'hello', '-f', 'json' ], tempDir);
+		expect(getResult.exitCode).toBe(0);
+		const out = JSON.parse(getResult.stdout);
+		expect(out.path).toBe('hello.md');
+		expect(out.title).toBe('Hello');
+		expect(out.content).toContain('World');
+	});
+
+	it('search returns indexed notes', async () => {
+		await runCli([ 'init', '-p', tempDir ]);
+		writeFileSync(join(tempDir, 'alpha.md'), '# Alpha\n\nContent.', 'utf-8');
+		writeFileSync(join(tempDir, 'beta.md'), '# Beta\n\nContent.', 'utf-8');
+		await runCli([ 'sync' ], tempDir);
+
+		const { exitCode, stdout } = await runCli([ 'search', 'alpha', '-f', 'json' ], tempDir);
+		expect(exitCode).toBe(0);
+		const data = JSON.parse(stdout);
+		expect(data.results).toBeDefined();
+		expect(data.results.length).toBeGreaterThanOrEqual(1);
+		expect(data.results.some((r: { basename: string }) => r.basename === 'alpha')).toBe(true);
+	});
+
+	it('get by path and by basename both resolve', async () => {
+		await runCli([ 'init', '-p', tempDir ]);
+		writeFileSync(join(tempDir, 'resolve.md'), '# Resolve\n\nBody.', 'utf-8');
+		await runCli([ 'sync' ], tempDir);
+
+		const byPath = await runCli([ 'get', 'resolve.md', '-f', 'text' ], tempDir);
+		const byBasename = await runCli([ 'get', 'resolve', '-f', 'text' ], tempDir);
+		expect(byPath.exitCode).toBe(0);
+		expect(byBasename.exitCode).toBe(0);
+		expect(byPath.stdout).toContain('Resolve');
+		expect(byBasename.stdout).toContain('Resolve');
+	});
+
+	it('init twice reports already initialized', async () => {
+		await runCli([ 'init', '-p', tempDir ]);
+		const { exitCode, stdout } = await runCli([ 'init', '-p', tempDir ]);
+		expect(exitCode).toBe(0);
+		expect(stdout).toContain('already initialized');
 	});
 });

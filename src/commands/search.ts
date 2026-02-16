@@ -3,7 +3,7 @@ import { ConfigManager } from '../utils/config.js';
 import { VaultManager } from '../utils/vault.js';
 
 /** Parse --modified-after / --modified-before value to unix ms. ISO 8601 or digits (ms). */
-function parseDateOption(value: string | undefined): number | undefined {
+export function parseDateOption(value: string | undefined): number | undefined {
   if (value === undefined || value === '') return undefined;
   const s = String(value).trim();
   if (/^\d+$/.test(s)) {

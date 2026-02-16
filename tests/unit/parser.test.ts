@@ -46,6 +46,23 @@ title: Note with tags
       expect(parsed.tags.some(t => t.name === 'tag2/sub')).toBe(true);
     });
 
+    it('does not extract tags inside code blocks', () => {
+      const content = `# Doc
+
+Real #tag in body.
+
+\`\`\`
+#fake-tag in fenced block
+\`\`\`
+
+Inline \`#code-tag\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.tags).toHaveLength(1);
+      expect(parsed.tags[0].name).toBe('tag');
+    });
+
     it('應該從內文提取 Obsidian 連結', () => {
       const content = `---
 title: Linked Note
