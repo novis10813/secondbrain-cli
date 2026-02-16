@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { VaultManager } from '../../src/utils/vault';
 import { ConfigManager } from '../../src/utils/config';
+import { DatabaseManager } from '../../src/utils/database';
+import type { Note } from '../../src/types';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -95,6 +97,40 @@ describe('VaultManager', () => {
       const result = await vaultManager.sync();
       
       expect(result.removed).toBe(1);
+    });
+
+    it('should run migration from old schema when notes exist and then sync', async () => {
+      const config = configManager.getConfig();
+      const db = new DatabaseManager(config);
+      const note: Note = {
+        id: 'migrated-id',
+        path: 'migrated-note.md',
+        name: 'migrated-note',
+        extension: '.md',
+        title: 'Migrated',
+        content: '# Migrated\n\nContent',
+        frontmatter: {},
+        tags: [],
+        links: [],
+        backlinks: [],
+        blockRefs: [],
+        embeds: [],
+        headings: [],
+        hash: 'abc123',
+        createdAt: '2025-01-01T00:00:00.000Z',
+        modifiedAt: '2025-01-02T00:00:00.000Z',
+        stat: { ctime: 1000, mtime: 2000, size: 50 }
+      };
+      db.upsertNote(note);
+      db.close();
+
+      vaultManager.writeNote('migrated-note.md', '# Migrated\n\nContent');
+      const result = await vaultManager.sync();
+
+      expect(result.added).toBe(1);
+      const file = vaultManager.getFileByPath('migrated-note.md');
+      expect(file).not.toBeNull();
+      expect(file?.path).toBe('migrated-note.md');
     });
 
     it('應該解析筆記標題', async () => {

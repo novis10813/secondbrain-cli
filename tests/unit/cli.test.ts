@@ -14,6 +14,7 @@ const EXPECTED_COMMANDS = [
 	'stats',
 	'orphans',
 	'config',
+	'migrate',
 ];
 
 async function runCli(args: string[]): Promise<{ exitCode: number; stdout: string; stderr: string }> {

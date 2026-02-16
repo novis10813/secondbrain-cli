@@ -23,6 +23,12 @@ export class VaultManager {
 		let updated = 0;
 		let removed = 0;
 
+		// Migrate any existing data from old schema first
+		const migrationResult = this.db.migrateFromOldSchema();
+		if (migrationResult.migrated > 0) {
+			added += migrationResult.migrated;
+		}
+
 		const currentPaths = new Set<string>();
 		const markdownFiles = this.findMarkdownFiles();
 
@@ -282,6 +288,11 @@ export class VaultManager {
 
   getStats() {
     return this.db.getStats();
+  }
+
+  /** Migrate data from old schema (notes) to new schema (files + content_metadata). */
+  migrateFromOldSchema(): { migrated: number; skipped: number; errors: number } {
+    return this.db.migrateFromOldSchema();
   }
 
   // New structure (files + content_metadata + links_with_positions)
