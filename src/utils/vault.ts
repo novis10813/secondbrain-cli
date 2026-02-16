@@ -128,6 +128,7 @@ export class VaultManager {
       links: links,
       blockRefs: parsed.blockRefs.map(b => b.blockId),
       embeds: parsed.embeds,
+      headings: parsed.headings.map(h => ({ level: h.level, text: h.text, line: h.line, column: h.column })),
       backlinks: [], // Will be computed by database
       hash,
       createdAt: stats.birthtime.toISOString(),

@@ -14,6 +14,14 @@ export interface EmbedRef {
   column: number;
 }
 
+/** Heading with position (H1–H6). */
+export interface HeadingRef {
+  level: number;
+  text: string;
+  line: number;
+  column: number;
+}
+
 /** Content-derived metadata: parsed from file content. Source: parser + hash. */
 export interface NoteContent {
   title: string;
@@ -23,6 +31,7 @@ export interface NoteContent {
   links: string[];
   blockRefs: string[];
   embeds: EmbedRef[];
+  headings: HeadingRef[];
   hash: string;
 }
 

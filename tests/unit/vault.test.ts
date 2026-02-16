@@ -135,6 +135,18 @@ describe('VaultManager', () => {
       expect(note?.blockRefs).toContain('abc123');
       expect(note?.blockRefs).toContain('xyz-99');
     });
+
+    it('應該解析並儲存 headings 到資料庫', async () => {
+      vaultManager.writeNote('outline.md', '# Main Title\n\nIntro.\n\n## Section A\n\nContent A.\n\n### Subsection\n\nDetail.');
+      await vaultManager.sync();
+
+      const note = vaultManager.getNoteByPath('outline.md');
+      expect(note?.headings).toBeDefined();
+      expect(note?.headings.length).toBe(3);
+      expect(note?.headings[0]).toEqual({ level: 1, text: 'Main Title', line: 1, column: 1 });
+      expect(note?.headings[1]).toEqual({ level: 2, text: 'Section A', line: 5, column: 1 });
+      expect(note?.headings[2]).toEqual({ level: 3, text: 'Subsection', line: 9, column: 1 });
+    });
   });
 
   describe('searchNotes', () => {
