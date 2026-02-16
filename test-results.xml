@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="bun test" tests="76" assertions="125" failures="0" skipped="0" time="6.49871663">
+  <testsuite name="tests/perf/database_perf.test.ts" file="tests/perf/database_perf.test.ts" tests="3" assertions="8" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="Database Performance" file="tests/perf/database_perf.test.ts" line="8" tests="3" assertions="8" failures="0" skipped="0" time="0.025" hostname="novis-B450-AORUS-ELITE">
+      <testcase name="should load all notes correctly with batch optimization" classname="Database Performance" time="0.003" file="tests/perf/database_perf.test.ts" line="47" assertions="1" />
+      <testcase name="should not churn links when content unchanged" classname="Database Performance" time="0.005" file="tests/perf/database_perf.test.ts" line="54" assertions="3" />
+      <testcase name="should only update changed links in diff mode" classname="Database Performance" time="0.02" file="tests/perf/database_perf.test.ts" line="69" assertions="4" />
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/parser.test.ts" file="tests/unit/parser.test.ts" tests="12" assertions="26" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="NoteParser" file="tests/unit/parser.test.ts" line="4" tests="12" assertions="26" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+      <testsuite name="parse" file="tests/unit/parser.test.ts" line="5" tests="6" assertions="11" failures="0" skipped="0" time="0.045" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該解析帶有 frontmatter 的筆記" classname="parse &amp;gt; NoteParser" time="0.046" file="tests/unit/parser.test.ts" line="6" assertions="3" />
+        <testcase name="應該解析沒有 frontmatter 的筆記" classname="parse &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="23" assertions="2" />
+        <testcase name="應該從內文提取 Obsidian 標籤" classname="parse &amp;gt; NoteParser" time="0.001" file="tests/unit/parser.test.ts" line="34" assertions="2" />
+        <testcase name="應該從內文提取 Obsidian 連結" classname="parse &amp;gt; NoteParser" time="0.001" file="tests/unit/parser.test.ts" line="49" assertions="2" />
+        <testcase name="當沒有 H1 標題時應該使用第一行作為標題" classname="parse &amp;gt; NoteParser" time="0.001" file="tests/unit/parser.test.ts" line="64" assertions="1" />
+        <testcase name="當內容為空時應該回傳 Untitled" classname="parse &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="74" assertions="1" />
+      </testsuite>
+      <testsuite name="computeHash" file="tests/unit/parser.test.ts" line="83" tests="3" assertions="3" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該產生 SHA256 hash" classname="computeHash &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="84" assertions="1" />
+        <testcase name="相同內容應該產生相同 hash" classname="computeHash &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="91" assertions="1" />
+        <testcase name="不同內容應該產生不同 hash" classname="computeHash &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="99" assertions="1" />
+      </testsuite>
+      <testsuite name="generateNoteContent" file="tests/unit/parser.test.ts" line="107" tests="2" assertions="7" failures="0" skipped="0" time="0.007" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該生成帶有 frontmatter 的筆記內容" classname="generateNoteContent &amp;gt; NoteParser" time="0.008" file="tests/unit/parser.test.ts" line="108" assertions="5" />
+        <testcase name="應該正確處理空 frontmatter" classname="generateNoteContent &amp;gt; NoteParser" time="0" file="tests/unit/parser.test.ts" line="119" assertions="2" />
+      </testsuite>
+      <testsuite name="generateDailyNoteContent" file="tests/unit/parser.test.ts" line="127" tests="1" assertions="5" failures="0" skipped="0" time="0.005" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該生成每日筆記內容" classname="generateDailyNoteContent &amp;gt; NoteParser" time="0.006" file="tests/unit/parser.test.ts" line="128" assertions="5" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/vault.test.ts" file="tests/unit/vault.test.ts" tests="21" assertions="31" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="VaultManager" file="tests/unit/vault.test.ts" line="8" tests="21" assertions="31" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+      <testsuite name="writeNote" file="tests/unit/vault.test.ts" line="25" tests="3" assertions="3" failures="0" skipped="0" time="0.198" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該寫入筆記檔案" classname="writeNote &amp;gt; VaultManager" time="0.131" file="tests/unit/vault.test.ts" line="26" assertions="1" />
+        <testcase name="應該自動創建父目錄" classname="writeNote &amp;gt; VaultManager" time="0.033" file="tests/unit/vault.test.ts" line="33" assertions="1" />
+        <testcase name="應該寫入正確的內容" classname="writeNote &amp;gt; VaultManager" time="0.037" file="tests/unit/vault.test.ts" line="40" assertions="1" />
+      </testsuite>
+      <testsuite name="readNote" file="tests/unit/vault.test.ts" line="49" tests="2" assertions="2" failures="0" skipped="0" time="0.056" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該讀取筆記內容" classname="readNote &amp;gt; VaultManager" time="0.026" file="tests/unit/vault.test.ts" line="50" assertions="1" />
+        <testcase name="應該在檔案不存在時回傳 null" classname="readNote &amp;gt; VaultManager" time="0.032" file="tests/unit/vault.test.ts" line="58" assertions="1" />
+      </testsuite>
+      <testsuite name="sync" file="tests/unit/vault.test.ts" line="64" tests="6" assertions="9" failures="0" skipped="0" time="0.402" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該新增新筆記到資料庫" classname="sync &amp;gt; VaultManager" time="0.037" file="tests/unit/vault.test.ts" line="65" assertions="3" />
+        <testcase name="應該偵測更新的筆記" classname="sync &amp;gt; VaultManager" time="0.178" file="tests/unit/vault.test.ts" line="75" assertions="1" />
+        <testcase name="應該移除已刪除的筆記" classname="sync &amp;gt; VaultManager" time="0.053" file="tests/unit/vault.test.ts" line="88" assertions="1" />
+        <testcase name="應該解析筆記標題" classname="sync &amp;gt; VaultManager" time="0.034" file="tests/unit/vault.test.ts" line="100" assertions="1" />
+        <testcase name="應該解析筆記標籤" classname="sync &amp;gt; VaultManager" time="0.04" file="tests/unit/vault.test.ts" line="108" assertions="2" />
+        <testcase name="應該解析筆記連結" classname="sync &amp;gt; VaultManager" time="0.066" file="tests/unit/vault.test.ts" line="117" assertions="1" />
+      </testsuite>
+      <testsuite name="searchNotes" file="tests/unit/vault.test.ts" line="131" tests="4" assertions="6" failures="0" skipped="0" time="0.306" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該搜尋標題" classname="searchNotes &amp;gt; VaultManager" time="0.067" file="tests/unit/vault.test.ts" line="140" assertions="2" />
+        <testcase name="應該搜尋內容" classname="searchNotes &amp;gt; VaultManager" time="0.083" file="tests/unit/vault.test.ts" line="147" assertions="2" />
+        <testcase name="應該支援標籤過濾" classname="searchNotes &amp;gt; VaultManager" time="0.092" file="tests/unit/vault.test.ts" line="154" assertions="1" />
+        <testcase name="應該限制結果數量" classname="searchNotes &amp;gt; VaultManager" time="0.068" file="tests/unit/vault.test.ts" line="163" assertions="1" />
+      </testsuite>
+      <testsuite name="getBacklinks" file="tests/unit/vault.test.ts" line="170" tests="1" assertions="3" failures="0" skipped="0" time="0.085" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該找到連結到指定筆記的其他筆記" classname="getBacklinks &amp;gt; VaultManager" time="0.086" file="tests/unit/vault.test.ts" line="171" assertions="3" />
+      </testsuite>
+      <testsuite name="getOrphans" file="tests/unit/vault.test.ts" line="190" tests="1" assertions="2" failures="0" skipped="0" time="0.071" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該找到沒有被連結的筆記" classname="getOrphans &amp;gt; VaultManager" time="0.072" file="tests/unit/vault.test.ts" line="191" assertions="2" />
+      </testsuite>
+      <testsuite name="getStats" file="tests/unit/vault.test.ts" line="205" tests="1" assertions="3" failures="0" skipped="0" time="0.053" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該回傳正確的統計資訊" classname="getStats &amp;gt; VaultManager" time="0.054" file="tests/unit/vault.test.ts" line="206" assertions="3" />
+      </testsuite>
+      <testsuite name="getDailyNotePath" file="tests/unit/vault.test.ts" line="220" tests="2" assertions="2" failures="0" skipped="0" time="0.049" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該回傳正確的每日筆記路徑" classname="getDailyNotePath &amp;gt; VaultManager" time="0.025" file="tests/unit/vault.test.ts" line="221" assertions="1" />
+        <testcase name="應該使用今天的日期當預設值" classname="getDailyNotePath &amp;gt; VaultManager" time="0.026" file="tests/unit/vault.test.ts" line="228" assertions="1" />
+      </testsuite>
+      <testsuite name="getTemplatePath" file="tests/unit/vault.test.ts" line="236" tests="1" assertions="1" failures="0" skipped="0" time="0.023" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該回傳正確的模板路徑" classname="getTemplatePath &amp;gt; VaultManager" time="0.024" file="tests/unit/vault.test.ts" line="237" assertions="1" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/template.test.ts" file="tests/unit/template.test.ts" tests="24" assertions="38" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="TemplateManager" file="tests/unit/template.test.ts" line="8" tests="24" assertions="38" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+      <testsuite name="createTemplate" file="tests/unit/template.test.ts" line="24" tests="3" assertions="3" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該創建模板檔案" classname="createTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="25" assertions="1" />
+        <testcase name="應該自動創建 Templates 目錄" classname="createTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="41" assertions="1" />
+        <testcase name="應該寫入正確的模板內容" classname="createTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="47" assertions="1" />
+      </testsuite>
+      <testsuite name="getTemplate" file="tests/unit/template.test.ts" line="57" tests="2" assertions="2" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該讀取模板內容" classname="getTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="58" assertions="1" />
+        <testcase name="應該在模板不存在時回傳 null" classname="getTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="66" assertions="1" />
+      </testsuite>
+      <testsuite name="listTemplates" file="tests/unit/template.test.ts" line="72" tests="2" assertions="5" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該列出所有模板" classname="listTemplates &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="73" assertions="4" />
+        <testcase name="應該在沒有模板時回傳空陣列" classname="listTemplates &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="86" assertions="1" />
+      </testsuite>
+      <testsuite name="deleteTemplate" file="tests/unit/template.test.ts" line="92" tests="2" assertions="2" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該刪除模板" classname="deleteTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="93" assertions="1" />
+        <testcase name="應該在不存在的模板上拋出錯誤" classname="deleteTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="102" assertions="1" />
+      </testsuite>
+      <testsuite name="renderTemplate" file="tests/unit/template.test.ts" line="107" tests="5" assertions="8" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該替換簡單變數" classname="renderTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="108" assertions="1" />
+        <testcase name="應該替換多個變數" classname="renderTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="117" assertions="1" />
+        <testcase name="應該保留未匹配的變數" classname="renderTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="130" assertions="1" />
+        <testcase name="應該支援模板中的 frontmatter" classname="renderTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="139" assertions="4" />
+        <testcase name="應該在不存在的模板上拋出錯誤" classname="renderTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="162" assertions="1" />
+      </testsuite>
+      <testsuite name="validateTemplate" file="tests/unit/template.test.ts" line="167" tests="4" assertions="7" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該識別模板中的變數" classname="validateTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="168" assertions="3" />
+        <testcase name="應該識別 frontmatter 中的變數" classname="validateTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="179" assertions="2" />
+        <testcase name="應該在沒有變數時回傳空陣列" classname="validateTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="194" assertions="1" />
+        <testcase name="應該去除重複的變數" classname="validateTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="203" assertions="1" />
+      </testsuite>
+      <testsuite name="insertTemplate" file="tests/unit/template.test.ts" line="213" tests="3" assertions="5" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該將渲染後的模板寫入指定路徑" classname="insertTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="214" assertions="3" />
+        <testcase name="應該自動創建父目錄" classname="insertTemplate &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="237" assertions="1" />
+        <testcase name="應該在模板不存在時拋出錯誤" classname="insertTemplate &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="249" assertions="1" />
+      </testsuite>
+      <testsuite name="getRequiredFields" file="tests/unit/template.test.ts" line="256" tests="3" assertions="6" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該回傳必填欄位列表" classname="getRequiredFields &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="257" assertions="3" />
+        <testcase name="應該檢查必填欄位是否提供" classname="getRequiredFields &amp;gt; TemplateManager" time="0.001" file="tests/unit/template.test.ts" line="275" assertions="2" />
+        <testcase name="應該在所有欄位都提供時回傳空陣列" classname="getRequiredFields &amp;gt; TemplateManager" time="0" file="tests/unit/template.test.ts" line="285" assertions="1" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/config.test.ts" file="tests/unit/config.test.ts" tests="15" assertions="21" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="ConfigManager" file="tests/unit/config.test.ts" line="7" tests="15" assertions="21" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+      <testsuite name="init" file="tests/unit/config.test.ts" line="20" tests="3" assertions="6" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該創建 .secondbrain 目錄" classname="init &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="21" assertions="1" />
+        <testcase name="應該創建預設設定檔" classname="init &amp;gt; ConfigManager" time="0.001" file="tests/unit/config.test.ts" line="28" assertions="4" />
+        <testcase name="應該寫入設定檔到磁碟" classname="init &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="37" assertions="1" />
+      </testsuite>
+      <testsuite name="isInitialized" file="tests/unit/config.test.ts" line="45" tests="2" assertions="2" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該在未初始化時回傳 false" classname="isInitialized &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="46" assertions="1" />
+        <testcase name="應該在初始化後回傳 true" classname="isInitialized &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="50" assertions="1" />
+      </testsuite>
+      <testsuite name="loadConfig" file="tests/unit/config.test.ts" line="56" tests="2" assertions="4" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該在未初始化時回傳 null" classname="loadConfig &amp;gt; ConfigManager" time="0.001" file="tests/unit/config.test.ts" line="57" assertions="1" />
+        <testcase name="應該載入已儲存的設定" classname="loadConfig &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="62" assertions="3" />
+      </testsuite>
+      <testsuite name="getConfig" file="tests/unit/config.test.ts" line="72" tests="2" assertions="2" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該在未初始化時拋出錯誤" classname="getConfig &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="73" assertions="1" />
+        <testcase name="應該回傳設定物件" classname="getConfig &amp;gt; ConfigManager" time="0.001" file="tests/unit/config.test.ts" line="77" assertions="1" />
+      </testsuite>
+      <testsuite name="updateConfig" file="tests/unit/config.test.ts" line="85" tests="3" assertions="4" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該更新特定設定值" classname="updateConfig &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="86" assertions="1" />
+        <testcase name="應該保留未更新的設定值" classname="updateConfig &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="94" assertions="2" />
+        <testcase name="應該將更新寫入磁碟" classname="updateConfig &amp;gt; ConfigManager" time="0.001" file="tests/unit/config.test.ts" line="103" assertions="1" />
+      </testsuite>
+      <testsuite name="findVaultPath" file="tests/unit/config.test.ts" line="114" tests="3" assertions="3" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+        <testcase name="應該在當前目錄找到 vault" classname="findVaultPath &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="115" assertions="1" />
+        <testcase name="應該在父目錄找到 vault" classname="findVaultPath &amp;gt; ConfigManager" time="0.001" file="tests/unit/config.test.ts" line="122" assertions="1" />
+        <testcase name="應該在找不到 vault 時回傳 null" classname="findVaultPath &amp;gt; ConfigManager" time="0" file="tests/unit/config.test.ts" line="131" assertions="1" />
+      </testsuite>
+    </testsuite>
+  </testsuite>
+  <testsuite name="tests/unit/database_upsert.test.ts" file="tests/unit/database_upsert.test.ts" tests="1" assertions="1" failures="0" skipped="0" time="0" hostname="novis-B450-AORUS-ELITE">
+    <testsuite name="DatabaseManager Upsert" file="tests/unit/database_upsert.test.ts" line="6" tests="1" assertions="1" failures="0" skipped="0" time="3.977" hostname="novis-B450-AORUS-ELITE">
+      <testcase name="should update a note when content changes but path remains the same" classname="DatabaseManager Upsert" time="3.977995" file="tests/unit/database_upsert.test.ts" line="14" assertions="1" />
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -77,11 +77,16 @@ export class NoteParser {
     }
 
     // From content body (Obsidian-style #tags)
+    // Strip code blocks to avoid extracting tags from code
+    const contentWithoutCode = content
+      .replace(/```[\s\S]*?```/g, '')  // Remove fenced code blocks
+      .replace(/`[^`]*`/g, '');          // Remove inline code
+    
     const tagRegex = /#([\w/-]+)/g;
     let match;
-    while ((match = tagRegex.exec(content)) !== null) {
+    while ((match = tagRegex.exec(contentWithoutCode)) !== null) {
       // Exclude headings
-      if (!content.substring(match.index - 1, match.index).match(/\n|^/)) {
+      if (!contentWithoutCode.substring(match.index - 1, match.index).match(/\n|^/)) {
         continue;
       }
       tags.add(match[1]);
@@ -130,7 +135,10 @@ export class NoteParser {
   }
 
   static generateDailyNoteContent(date: Date, content: string): string {
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     const frontmatter = {
       date: dateStr,
       tags: ['daily'],

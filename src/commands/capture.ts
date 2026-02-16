@@ -65,8 +65,13 @@ export function createCaptureCommand(): Command {
         // Write note
         vault.writeNote(notePath, noteContent);
 
-        // Sync to database
-        await vault.sync();
+        // Sync single note to database (optimized - no full vault scan)
+        const content = vault.readNote(notePath);
+        if (content) {
+          const hash = NoteParser.computeHash(content);
+          const note = await vault.createNoteFromFile(notePath, content, hash);
+          vault.upsertNote(note);
+        }
 
         const note = vault.getNoteByPath(notePath);
         

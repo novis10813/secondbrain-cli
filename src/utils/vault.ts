@@ -26,6 +26,7 @@ export class VaultManager {
     const currentPaths = new Set<string>();
     const markdownFiles = this.findMarkdownFiles();
 
+    // Pass 1: Collect all files and upsert basic metadata with empty links
     for (const filePath of markdownFiles) {
       const relativePath = relative(this.config.vaultPath, filePath);
       currentPaths.add(relativePath);
@@ -36,16 +37,40 @@ export class VaultManager {
       // Check if note exists and if hash changed
       const existingNote = this.db.getNoteByPath(relativePath);
       if (!existingNote) {
-        // New note
-        const note = await this.createNoteFromFile(relativePath, content, hash);
+        // New note - create with empty links
+        const note = await this.createNoteFromFile(relativePath, content, hash, []);
         this.db.upsertNote(note);
         added++;
       } else if (existingNote.hash !== hash) {
-        // Updated note
-        const note = await this.createNoteFromFile(relativePath, content, hash);
+        // Updated note - preserve ID, use empty links initially
+        const note = await this.createNoteFromFile(relativePath, content, hash, []);
         note.id = existingNote.id; // Keep same ID
         this.db.upsertNote(note);
         updated++;
+      }
+    }
+
+    // Pass 2: Resolve links against populated database
+    for (const filePath of markdownFiles) {
+      const relativePath = relative(this.config.vaultPath, filePath);
+      const content = readFileSync(filePath, 'utf-8');
+      const parsed = NoteParser.parse(content);
+      
+      // Get the note ID
+      const note = this.db.getNoteByPath(relativePath);
+      if (note) {
+        // Resolve link titles to note IDs
+        const linkIds: string[] = [];
+        for (const linkTitle of parsed.links) {
+          const linkedNote = this.findNoteByTitleOrPath(linkTitle);
+          if (linkedNote) {
+            linkIds.push(linkedNote.id);
+          }
+        }
+        
+        // Update note with resolved links
+        note.links = linkIds;
+        this.db.upsertNote(note);
       }
     }
 
@@ -83,20 +108,10 @@ export class VaultManager {
     return files;
   }
 
-  private async createNoteFromFile(path: string, content: string, hash: string): Promise<Note> {
+  async createNoteFromFile(path: string, content: string, hash: string, links: string[] = []): Promise<Note> {
     const parsed = NoteParser.parse(content);
     const fullPath = join(this.config.vaultPath, path);
     const stats = statSync(fullPath);
-
-    // Resolve link titles to note IDs
-    const linkIds: string[] = [];
-    for (const linkTitle of parsed.links) {
-      // Try to find note by title or path
-      const linkedNote = this.findNoteByTitleOrPath(linkTitle);
-      if (linkedNote) {
-        linkIds.push(linkedNote.id);
-      }
-    }
 
     return {
       id: hash,
@@ -105,7 +120,7 @@ export class VaultManager {
       content: parsed.content,
       frontmatter: parsed.frontmatter,
       tags: parsed.tags,
-      links: linkIds,
+      links: links,
       backlinks: [], // Will be computed by database
       hash,
       createdAt: stats.birthtime.toISOString(),
@@ -131,11 +146,8 @@ export class VaultManager {
       if (note) return note;
     }
 
-    // Search by title
-    const allNotes = this.db.getAllNotes();
-    const byTitle = allNotes.find(n => 
-      n.title.toLowerCase() === titleOrPath.toLowerCase()
-    );
+    // Search by title using SQL (case-insensitive)
+    const byTitle = this.db.getNoteByTitle(titleOrPath);
     if (byTitle) return byTitle;
 
     return null;
@@ -164,7 +176,10 @@ export class VaultManager {
 
   // Get daily note path
   getDailyNotePath(date: Date = new Date()): string {
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     return join(this.config.dailyNotesFolder, `${dateStr}.md`);
   }
 
@@ -200,5 +215,10 @@ export class VaultManager {
 
   getGraphData() {
     return this.db.getGraphData();
+  }
+
+  // Database proxy methods
+  upsertNote(note: Note): void {
+    return this.db.upsertNote(note);
   }
 }
