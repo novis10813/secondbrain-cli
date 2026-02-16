@@ -236,6 +236,18 @@ describe('VaultManager', () => {
       expect(dailyResults.some(r => r.file.basename === '2024-01-01')).toBe(true);
       expect(projectResults.some(r => r.file.basename === 'task')).toBe(true);
     });
+
+    it('應該支援 modified-after / modified-before 過濾', async () => {
+      const resultsAll = vaultManager.searchFiles(
+        '', undefined, 20, undefined, undefined, undefined, 0
+      );
+      expect(resultsAll.length).toBeGreaterThan(0);
+
+      const resultsNone = vaultManager.searchFiles(
+        '', undefined, 20, undefined, undefined, undefined, Date.now() + 86400000
+      );
+      expect(resultsNone.length).toBe(0);
+    });
   });
 
   describe('getBacklinksByPath (new structure)', () => {
@@ -252,6 +264,23 @@ describe('VaultManager', () => {
       expect(backlinks.length).toBe(2);
       expect(backlinks.some(f => f.basename === 'link1')).toBe(true);
       expect(backlinks.some(f => f.basename === 'link2')).toBe(true);
+    });
+  });
+
+  describe('getOutlinksByPath (new structure)', () => {
+    it('應該找到指定筆記連結出去的其他筆記', async () => {
+      vaultManager.writeNote('target.md', '# Target\n\n目標筆記');
+      vaultManager.writeNote('other.md', '# Other\n\n其他筆記');
+      await vaultManager.sync();
+
+      vaultManager.writeNote('source.md', '# Source\n\n連結到 [[target]] 與 [[other]]');
+      await vaultManager.sync();
+
+      const outlinks = vaultManager.getOutlinksByPath('source.md');
+
+      expect(outlinks.length).toBe(2);
+      expect(outlinks.some(f => f.basename === 'target')).toBe(true);
+      expect(outlinks.some(f => f.basename === 'other')).toBe(true);
     });
   });
 

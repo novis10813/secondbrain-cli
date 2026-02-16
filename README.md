@@ -45,6 +45,9 @@ sb search "API 設計" --tags="tech" --format=json
 # 取得 backlinks
 sb backlinks <path-or-id>
 
+# 取得 outlinks（此筆記連結出去的筆記）
+sb outlinks <path-or-id>
+
 # 找孤兒筆記
 sb orphans
 ```
@@ -75,6 +78,7 @@ sb search "關鍵字" \                 # 搜尋
 
 sb get <path-or-id>                  # 取得單一筆記（路徑或檔名）
 sb backlinks <path-or-id>            # 取得 backlinks
+sb outlinks <path-or-id>             # 取得 outlinks（此筆記連結出去的筆記）
 ```
 
 ### Vault 維護

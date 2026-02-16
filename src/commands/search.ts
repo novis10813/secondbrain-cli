@@ -2,6 +2,18 @@ import { Command } from 'commander';
 import { ConfigManager } from '../utils/config.js';
 import { VaultManager } from '../utils/vault.js';
 
+/** Parse --modified-after / --modified-before value to unix ms. ISO 8601 or digits (ms). */
+function parseDateOption(value: string | undefined): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  const s = String(value).trim();
+  if (/^\d+$/.test(s)) {
+    const n = parseInt(s, 10);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  const ms = Date.parse(s);
+  return Number.isFinite(ms) ? ms : undefined;
+}
+
 export function createSearchCommand(): Command {
   const command = new Command('search')
     .description('Search notes by path/basename and tags')
@@ -11,6 +23,8 @@ export function createSearchCommand(): Command {
     .option('-l, --limit <limit>', 'Maximum results', '20')
     .option('--links-to <path>', 'Only files that link to this path or basename')
     .option('--heading <text>', 'Only files that contain a heading matching this text')
+    .option('--modified-after <date>', 'Only files modified after date (ISO 8601 or unix ms)')
+    .option('--modified-before <date>', 'Only files modified before date (ISO 8601 or unix ms)')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action((query, options) => {
       try {
@@ -28,6 +42,8 @@ export function createSearchCommand(): Command {
         const limit = parseInt(options.limit);
         const pathPrefix = options.path?.trim() || undefined;
         const headingQuery = options.heading?.trim() || undefined;
+        const modifiedAfter = parseDateOption(options.modifiedAfter);
+        const modifiedBefore = parseDateOption(options.modifiedBefore);
         let linksToPath: string | undefined;
         if (options.linksTo?.trim()) {
           const file = vault.resolvePathOrBasename(options.linksTo.trim());
@@ -39,7 +55,7 @@ export function createSearchCommand(): Command {
         }
 
         const results = vault.searchFiles(
-          query ?? '', tags, limit, pathPrefix, linksToPath, headingQuery
+          query ?? '', tags, limit, pathPrefix, linksToPath, headingQuery, modifiedAfter, modifiedBefore
         );
 
         if (options.format === 'json') {
@@ -51,7 +67,15 @@ export function createSearchCommand(): Command {
 
           console.log(JSON.stringify({
             query: query ?? '',
-            filters: { tags, limit, path: pathPrefix, linksTo: linksToPath, heading: headingQuery },
+            filters: {
+              tags,
+              limit,
+              path: pathPrefix,
+              linksTo: linksToPath,
+              heading: headingQuery,
+              modifiedAfter: modifiedAfter ?? undefined,
+              modifiedBefore: modifiedBefore ?? undefined
+            },
             results: output,
             total: output.length
           }, null, 2));

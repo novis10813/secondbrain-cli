@@ -277,4 +277,114 @@ describe('DatabaseManager FileInfo Operations', () => {
 
     db.close();
   }, 15000);
+
+  it('should filter searchFiles by modifiedAfter and modifiedBefore', () => {
+    const db = new DatabaseManager(config);
+    const t1 = 1000;
+    const t2 = 2000;
+    const t3 = 3000;
+    db.upsertFile(
+      {
+        path: 'old.md',
+        name: 'old.md',
+        basename: 'old',
+        extension: 'md',
+        parent: null,
+        stat: { ctime: t1, mtime: t1, size: 10 }
+      },
+      'h1'
+    );
+    db.upsertFile(
+      {
+        path: 'mid.md',
+        name: 'mid.md',
+        basename: 'mid',
+        extension: 'md',
+        parent: null,
+        stat: { ctime: t2, mtime: t2, size: 10 }
+      },
+      'h2'
+    );
+    db.upsertFile(
+      {
+        path: 'new.md',
+        name: 'new.md',
+        basename: 'new',
+        extension: 'md',
+        parent: null,
+        stat: { ctime: t3, mtime: t3, size: 10 }
+      },
+      'h3'
+    );
+
+    const after1500 = db.searchFiles('', undefined, 20, undefined, undefined, undefined, 1500);
+    expect(after1500.length).toBe(2);
+    expect(after1500.map(r => r.file.basename).sort()).toEqual(['mid', 'new']);
+
+    const before2500 = db.searchFiles('', undefined, 20, undefined, undefined, undefined, undefined, 2500);
+    expect(before2500.length).toBe(2);
+    expect(before2500.map(r => r.file.basename).sort()).toEqual(['mid', 'old']);
+
+    const window = db.searchFiles('', undefined, 20, undefined, undefined, undefined, 1500, 2500);
+    expect(window.length).toBe(1);
+    expect(window[0].file.basename).toBe('mid');
+
+    db.close();
+  }, 15000);
+
+  it('should return outlinks for a file (files it links to)', () => {
+    const db = new DatabaseManager(config);
+    const target: FileInfo = {
+      path: 'target.md',
+      name: 'target.md',
+      basename: 'target',
+      extension: 'md',
+      parent: null,
+      stat: { ctime: 1000, mtime: 2000, size: 10 }
+    };
+    const other: FileInfo = {
+      path: 'other.md',
+      name: 'other.md',
+      basename: 'other',
+      extension: 'md',
+      parent: null,
+      stat: { ctime: 1000, mtime: 2000, size: 10 }
+    };
+    const source: FileInfo = {
+      path: 'source.md',
+      name: 'source.md',
+      basename: 'source',
+      extension: 'md',
+      parent: null,
+      stat: { ctime: 1000, mtime: 2000, size: 10 }
+    };
+    db.upsertFile(target, 'h1');
+    db.upsertFile(other, 'h2');
+    db.upsertFile(source, 'h3');
+
+    const linkMetadata: ContentMetadata = {
+      links: [
+        {
+          link: 'target.md',
+          original: '[[target]]',
+          position: { start: { line: 0, col: 0, offset: 0 }, end: { line: 0, col: 10, offset: 10 } }
+        },
+        {
+          link: 'other.md',
+          original: '[[other]]',
+          position: { start: { line: 1, col: 0, offset: 12 }, end: { line: 1, col: 10, offset: 22 } }
+        }
+      ]
+    };
+    db.upsertContentMetadata('source.md', linkMetadata, 'h3');
+
+    const outlinks = db.getOutlinksByPath('source.md');
+    expect(outlinks.length).toBe(2);
+    expect(outlinks.map(o => o.path).sort()).toEqual(['other.md', 'target.md']);
+
+    const noOutlinks = db.getOutlinksByPath('target.md');
+    expect(noOutlinks.length).toBe(0);
+
+    db.close();
+  }, 15000);
 });

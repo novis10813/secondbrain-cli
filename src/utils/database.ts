@@ -441,6 +441,26 @@ export class DatabaseManager {
 		}));
 	}
 
+	/** Get files that the given file links to (outgoing links, new structure). */
+	getOutlinksByPath(filePath: string): FileInfo[] {
+		const rows = this.db.prepare(`
+			SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
+			FROM files f
+			INNER JOIN (
+				SELECT DISTINCT target_path FROM links_with_positions
+				WHERE source_path = ? AND target_path IS NOT NULL AND target_path != ''
+			) l ON f.path = l.target_path
+		`).all(filePath) as any[];
+		return rows.map(row => ({
+			path: row.path,
+			name: row.name,
+			basename: row.basename,
+			extension: row.extension,
+			parent: row.parent,
+			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
+		}));
+	}
+
 	/** Get files with no incoming or outgoing links (new structure). */
 	getOrphanFiles(): FileInfo[] {
 		const rows = this.db.prepare(`
@@ -458,14 +478,16 @@ export class DatabaseManager {
 		}));
 	}
 
-	/** Search files by path/basename, optional tags, path prefix, links-to target, or heading (new structure). */
+	/** Search files by path/basename, optional tags, path prefix, links-to target, heading, or mtime (new structure). */
 	searchFiles(
 		query: string,
 		tags?: string[],
 		limit: number = 20,
 		pathPrefix?: string,
 		linksToPath?: string,
-		headingQuery?: string
+		headingQuery?: string,
+		modifiedAfter?: number,
+		modifiedBefore?: number
 	): Array<{ file: FileInfo; tags: string[] }> {
 		const like = `%${query}%`;
 		let sql = `
@@ -489,6 +511,14 @@ export class DatabaseManager {
 		if (headingQuery !== undefined && headingQuery !== '') {
 			sql += ` AND f.path IN (SELECT file_path FROM headings_with_positions WHERE heading LIKE ?)`;
 			params.push(`%${headingQuery}%`);
+		}
+		if (modifiedAfter !== undefined && Number.isFinite(modifiedAfter)) {
+			sql += ` AND f.mtime >= ?`;
+			params.push(modifiedAfter);
+		}
+		if (modifiedBefore !== undefined && Number.isFinite(modifiedBefore)) {
+			sql += ` AND f.mtime <= ?`;
+			params.push(modifiedBefore);
 		}
 		sql += ` ORDER BY f.mtime DESC LIMIT ?`;
 		params.push(limit);

@@ -266,6 +266,10 @@ export class VaultManager {
     return this.db.getBacklinksByPath(filePath);
   }
 
+  getOutlinksByPath(filePath: string): FileInfo[] {
+    return this.db.getOutlinksByPath(filePath);
+  }
+
   getOrphanFiles(): FileInfo[] {
     return this.db.getOrphanFiles();
   }
@@ -276,9 +280,13 @@ export class VaultManager {
     limit: number = 20,
     pathPrefix?: string,
     linksToPath?: string,
-    headingQuery?: string
+    headingQuery?: string,
+    modifiedAfter?: number,
+    modifiedBefore?: number
   ): Array<{ file: FileInfo; tags: string[] }> {
-    return this.db.searchFiles(query, tags, limit, pathPrefix, linksToPath, headingQuery);
+    return this.db.searchFiles(
+      query, tags, limit, pathPrefix, linksToPath, headingQuery, modifiedAfter, modifiedBefore
+    );
   }
 
   getGraphData() {
