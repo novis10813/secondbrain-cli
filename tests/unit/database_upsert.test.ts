@@ -61,4 +61,58 @@ describe('DatabaseManager Upsert', () => {
     expect(saved?.headings).toEqual(headings);
     db.close();
   });
+
+  it('persists TFile-aligned fields (parent, basename, stat) and returns them on get', () => {
+    const db = new DatabaseManager(config);
+    const note = {
+      id: 'tf1',
+      path: 'folder/note.md',
+      title: 'T',
+      content: 'C',
+      frontmatter: {},
+      tags: [],
+      links: [],
+      blockRefs: [],
+      embeds: [],
+      headings: [],
+      hash: 'tf1',
+      createdAt: '2025-01-01T00:00:00.000Z',
+      modifiedAt: '2025-01-02T00:00:00.000Z',
+      parent: 'folder',
+      basename: 'note',
+      stat: { ctime: 1000, mtime: 2000, size: 42 }
+    };
+    db.upsertNote(note as any);
+    const saved = db.getNoteByPath('folder/note.md');
+    expect(saved?.parent).toBe('folder');
+    expect(saved?.basename).toBe('note');
+    expect(saved?.stat).toEqual({ ctime: 1000, mtime: 2000, size: 42 });
+    db.close();
+  });
+
+  it('accepts notes without TFile-aligned fields (backward compatible)', () => {
+    const db = new DatabaseManager(config);
+    const note = {
+      id: 'legacy1',
+      path: 'legacy.md',
+      title: 'L',
+      content: 'C',
+      frontmatter: {},
+      tags: [],
+      links: [],
+      blockRefs: [],
+      embeds: [],
+      headings: [],
+      hash: 'legacy1',
+      createdAt: '',
+      modifiedAt: ''
+    };
+    db.upsertNote(note as any);
+    const saved = db.getNoteByPath('legacy.md');
+    expect(saved?.id).toBe('legacy1');
+    expect(saved?.parent).toBeUndefined();
+    expect(saved?.basename).toBeUndefined();
+    expect(saved?.stat).toBeUndefined();
+    db.close();
+  });
 });

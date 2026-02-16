@@ -153,6 +153,12 @@ export interface NoteContent {
 export interface Note extends VaultFile, NoteContent {
   id: string;
   backlinks: string[];
+  /** Parent folder path (relative to vault). TFile-aligned. */
+  parent?: string | null;
+  /** Filename without extension. TFile-aligned. */
+  basename?: string;
+  /** File stats (ctime/mtime ms, size bytes). TFile-aligned. */
+  stat?: FileStats;
 }
 
 export interface SearchResult {

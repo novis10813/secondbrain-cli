@@ -116,6 +116,9 @@ export class VaultManager {
 
     const ext = extname(path) || '.md';
     const name = basename(path, ext) || basename(path);
+    const parentDir = dirname(path);
+    const parent = parentDir === '.' ? null : parentDir;
+
     return {
       id: hash,
       path,
@@ -132,7 +135,14 @@ export class VaultManager {
       backlinks: [], // Will be computed by database
       hash,
       createdAt: stats.birthtime.toISOString(),
-      modifiedAt: stats.mtime.toISOString()
+      modifiedAt: stats.mtime.toISOString(),
+      parent,
+      basename: name,
+      stat: {
+        ctime: stats.birthtimeMs,
+        mtime: stats.mtimeMs,
+        size: stats.size
+      }
     };
   }
 

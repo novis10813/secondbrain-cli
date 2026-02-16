@@ -52,6 +52,21 @@ export class DatabaseManager {
       // Column already exists
     }
 
+    // TFile-aligned columns (parent, basename, ctime, mtime, size)
+    for (const col of [
+      'parent TEXT',
+      'basename TEXT',
+      'ctime INTEGER',
+      'mtime INTEGER',
+      'size INTEGER'
+    ]) {
+      try {
+        this.db.exec(`ALTER TABLE notes ADD COLUMN ${col}`);
+      } catch {
+        // Column already exists
+      }
+    }
+
     // Links table (many-to-many)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS links (
@@ -79,8 +94,8 @@ export class DatabaseManager {
   // Note operations
   upsertNote(note: Note): void {
     const stmt = this.db.prepare(`
-      INSERT INTO notes (id, path, title, content, frontmatter, tags, block_refs, embeds, headings, hash, created_at, modified_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO notes (id, path, title, content, frontmatter, tags, block_refs, embeds, headings, hash, created_at, modified_at, parent, basename, ctime, mtime, size)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
         id = excluded.id,
         title = excluded.title,
@@ -91,8 +106,17 @@ export class DatabaseManager {
         embeds = excluded.embeds,
         headings = excluded.headings,
         hash = excluded.hash,
-        modified_at = excluded.modified_at
+        modified_at = excluded.modified_at,
+        parent = excluded.parent,
+        basename = excluded.basename,
+        ctime = excluded.ctime,
+        mtime = excluded.mtime,
+        size = excluded.size
     `);
+
+    const ctime = note.stat?.ctime ?? null;
+    const mtime = note.stat?.mtime ?? null;
+    const size = note.stat?.size ?? null;
 
     stmt.run(
       note.id,
@@ -106,7 +130,12 @@ export class DatabaseManager {
       JSON.stringify(note.headings),
       note.hash,
       note.createdAt,
-      note.modifiedAt
+      note.modifiedAt,
+      note.parent ?? null,
+      note.basename ?? null,
+      ctime,
+      mtime,
+      size
     );
 
     // Update links
@@ -251,6 +280,10 @@ export class DatabaseManager {
     const backlinks = this.db.prepare('SELECT source_id FROM links WHERE target_id = ?').all(row.id);
     const ext = extname(row.path) || '.md';
     const name = basename(row.path, ext) || basename(row.path);
+    const stat =
+      row.ctime != null && row.mtime != null && row.size != null
+        ? { ctime: row.ctime, mtime: row.mtime, size: row.size }
+        : undefined;
 
     return {
       id: row.id,
@@ -268,7 +301,10 @@ export class DatabaseManager {
       headings: JSON.parse(row.headings ?? '[]'),
       hash: row.hash,
       createdAt: row.created_at,
-      modifiedAt: row.modified_at
+      modifiedAt: row.modified_at,
+      parent: row.parent ?? undefined,
+      basename: row.basename ?? undefined,
+      stat
     };
   }
 
@@ -331,6 +367,10 @@ export class DatabaseManager {
       const backlinks = linkData.get(row.id)?.backlinks || [];
       const ext = extname(row.path) || '.md';
       const name = basename(row.path, ext) || basename(row.path);
+      const stat =
+        row.ctime != null && row.mtime != null && row.size != null
+          ? { ctime: row.ctime, mtime: row.mtime, size: row.size }
+          : undefined;
 
       return {
         id: row.id,
@@ -349,6 +389,9 @@ export class DatabaseManager {
         hash: row.hash,
         createdAt: row.created_at,
         modifiedAt: row.modified_at,
+        parent: row.parent ?? undefined,
+        basename: row.basename ?? undefined,
+        stat
       };
     });
   }
