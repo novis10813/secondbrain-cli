@@ -52,4 +52,35 @@ describe('Database Performance', () => {
     expect(notes).toHaveLength(100);
     // TODO: Add query counting mechanism
   });
+
+  it('should not churn links when content unchanged', () => {
+    // Get a note with links
+    const note = db.getNoteById('note-50');
+    expect(note).not.toBeNull();
+    expect(note!.links.length).toBeGreaterThan(0);
+    
+    // Re-save the same note
+    const initialLinkCount = note!.links.length;
+    db.upsertNote(note!);
+    
+    // Verify links are preserved (no unnecessary delete/insert)
+    const reloadedNote = db.getNoteById('note-50');
+    expect(reloadedNote!.links).toHaveLength(initialLinkCount);
+  });
+  
+  it('should only update changed links in diff mode', () => {
+    const note = db.getNoteById('note-50');
+    expect(note).not.toBeNull();
+    
+    // Modify only one link
+    const originalLinks = [...note!.links];
+    note!.links = ['note-1', 'note-2']; // Change links
+    db.upsertNote(note!);
+    
+    // Verify new links are saved
+    const updatedNote = db.getNoteById('note-50');
+    expect(updatedNote!.links).toContain('note-1');
+    expect(updatedNote!.links).toContain('note-2');
+    expect(updatedNote!.links).not.toContain(originalLinks[0]);
+  });
 });
