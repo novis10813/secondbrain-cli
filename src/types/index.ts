@@ -1,3 +1,24 @@
+/** File stats (Obsidian FileStats): ctime/mtime in ms, size in bytes. */
+export interface FileStats {
+  ctime: number;
+  mtime: number;
+  size: number;
+}
+
+/**
+ * File system info matching Obsidian's TFile.
+ * path = path relative to vault root; name = filename with extension;
+ * basename = filename without extension; extension = extension without leading dot.
+ */
+export interface FileInfo {
+  path: string;
+  name: string;
+  basename: string;
+  extension: string;
+  parent: string | null;
+  stat: FileStats;
+}
+
 /** File system info (TFile equivalent): path, name, stat. Source: filesystem only. */
 export interface VaultFile {
   path: string;
