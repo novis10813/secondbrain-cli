@@ -48,6 +48,9 @@ sb backlinks <path-or-id>
 # 取得 outlinks（此筆記連結出去的筆記）
 sb outlinks <path-or-id>
 
+# 解析連結為 path:line:col（支援 note、note#heading、note#^block-id）
+sb open "My Note#Section"
+
 # 找孤兒筆記
 sb orphans
 ```
@@ -83,6 +86,7 @@ sb search "關鍵字" \                 # 搜尋
 sb get <path-or-id>                  # 取得單一筆記（路徑或檔名）
 sb backlinks <path-or-id>            # 取得 backlinks
 sb outlinks <path-or-id>             # 取得 outlinks（此筆記連結出去的筆記）
+sb open <linkpath>                   # 解析連結為 path:line:col（編輯器導航）
 ```
 
 ### Vault 維護

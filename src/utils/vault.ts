@@ -423,4 +423,43 @@ export class VaultManager {
 
     return null;
   }
+
+  /**
+   * Resolve a linkpath to a file and position (line, col) for editor navigation.
+   * Supports note, note#heading, note#^block-id, and note#heading#^block-id.
+   * @returns { path, line, col } (1-based) or null if file not found
+   */
+  resolveLinkToPosition(
+    linkpath: string,
+    sourcePath: string
+  ): { path: string; line: number; col: number } | null {
+    const parts = linkpath.split('#').map(p => p.trim());
+    const filePart = parts[0];
+    if (!filePart) return null;
+
+    const file = this.getFirstLinkpathDest(filePart, sourcePath);
+    if (!file) return null;
+
+    const fragments = parts.slice(1);
+    if (fragments.length === 0) {
+      return { path: file.path, line: 1, col: 1 };
+    }
+
+    const last = fragments[fragments.length - 1];
+    const blockId = last.startsWith('^') ? last.slice(1) : null;
+    const headingFragment =
+      blockId && fragments.length > 1
+        ? fragments.slice(0, -1).join(' ')
+        : fragments.join(' ');
+
+    if (blockId) {
+      const pos = this.db.getBlockPosition(file.path, blockId);
+      if (pos) return { path: file.path, ...pos };
+    }
+    if (headingFragment) {
+      const pos = this.db.getHeadingPosition(file.path, headingFragment);
+      if (pos) return { path: file.path, ...pos };
+    }
+    return { path: file.path, line: 1, col: 1 };
+  }
 }

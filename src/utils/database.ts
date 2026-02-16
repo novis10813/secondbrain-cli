@@ -461,6 +461,35 @@ export class DatabaseManager {
 		}));
 	}
 
+	/**
+	 * Get start position of a heading in a file. Matches by exact heading text or Obsidian-style slug.
+	 * @returns { line, col } (1-based) or null
+	 */
+	getHeadingPosition(filePath: string, headingFragment: string): { line: number; col: number } | null {
+		const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-');
+		const fragmentSlug = slug(headingFragment);
+		const rows = this.db.prepare(
+			'SELECT heading, start_line, start_col FROM headings_with_positions WHERE file_path = ?'
+		).all(filePath) as { heading: string; start_line: number; start_col: number }[];
+		for (const row of rows) {
+			if (row.heading === headingFragment || slug(row.heading) === fragmentSlug) {
+				return { line: row.start_line, col: row.start_col };
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * Get start position of a block (^block-id) in a file.
+	 * @returns { line, col } (1-based) or null
+	 */
+	getBlockPosition(filePath: string, blockId: string): { line: number; col: number } | null {
+		const row = this.db.prepare(
+			'SELECT start_line, start_col FROM blocks_with_positions WHERE file_path = ? AND block_id = ?'
+		).get(filePath, blockId) as { start_line: number; start_col: number } | undefined;
+		return row ? { line: row.start_line, col: row.start_col } : null;
+	}
+
 	/** Get files with no incoming or outgoing links (new structure). */
 	getOrphanFiles(): FileInfo[] {
 		const rows = this.db.prepare(`

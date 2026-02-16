@@ -14,6 +14,7 @@ const EXPECTED_COMMANDS = [
 	'get',
 	'backlinks',
 	'outlinks',
+	'open',
 	'sync',
 	'stats',
 	'orphans',
