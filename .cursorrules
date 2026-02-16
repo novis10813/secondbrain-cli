@@ -1,0 +1,173 @@
+# Cursor Rules for SecondBrain CLI
+
+## Code Change Philosophy
+
+Keep changes small and focused:
+- One logical change per commit
+- If a task feels too large, break it into subtasks
+- Prefer multiple small commits over one large commit
+- Run feedback loops after each change, not at the end
+- Quality over speed. Small steps compound into big progress.
+
+## Task Prioritization
+
+When choosing the next task, prioritize in this order:
+1. Architectural decisions and core abstractions
+2. Integration points between modules
+3. Unknown unknowns and spike work
+4. Standard features and implementation
+5. Polish, cleanup, and quick wins
+
+Fail fast on risky work. Save easy wins for later.
+
+## Code Quality
+
+Write concise code. At the end of each code file ask yourself:
+"Would a senior engineer say this is overcomplicated?"
+If yes, simplify.
+
+Avoid over-engineering:
+- Only make changes directly requested or clearly necessary
+- Don't add features beyond what was asked
+- Don't refactor unrelated code
+- A bug fix doesn't need surrounding code cleaned up
+- A simple feature doesn't need extra configurability
+
+Clean code practices:
+- Don't fill files just for the sake of it
+- Don't leave dead code - delete unused code completely
+- No backwards-compatibility hacks for removed code
+- No `// removed` comments
+- Be organized, concise, and clean
+
+## Legacy Mindset
+
+This codebase will outlive you. Every shortcut becomes someone else's burden.
+Every hack compounds into technical debt that slows the team down.
+
+You are shaping the future of this project:
+- The patterns you establish will be copied
+- The corners you cut will be cut again
+
+Fight entropy. Leave the codebase better than you found it.
+
+## Project Specifics
+
+### Tech Stack
+- Runtime: Bun (with Node.js fallback)
+- Language: TypeScript (strict mode)
+- Package Manager: Bun/npm
+- Database: SQLite (bun:sqlite)
+- CLI Framework: Commander.js
+
+### Directory Structure
+```
+src/
+├── commands/          # CLI command handlers
+├── types/             # TypeScript type definitions
+├── utils/             # Utility modules
+│   ├── config.ts      # Configuration management
+│   ├── database.ts    # SQLite database operations
+│   ├── parser.ts      # Markdown parsing
+│   ├── template.ts    # Template handling
+│   └── vault.ts       # Vault operations
+└── index.ts           # Entry point
+```
+
+### Code Standards
+- Indentation: tabs (2 space width)
+- Line width: 100 characters
+- Line endings: LF
+- Use TypeScript strict mode
+- Prefer async/await over promises
+- Use descriptive variable and function names
+
+### File Naming
+- Use kebab-case for files: `database-manager.ts`
+- Use PascalCase for classes: `DatabaseManager`
+- Use camelCase for functions and variables: `getNoteById`
+
+### Import Organization
+- Group imports: external packages first, then internal modules
+- Use absolute imports from `src/` when possible
+- Avoid circular dependencies
+
+### Error Handling
+- Use try-catch blocks for async operations
+- Provide meaningful error messages
+- Log errors appropriately
+- Exit with proper error codes (1 for errors, 0 for success)
+
+### Database Operations
+- Use transactions for multi-step operations
+- Always handle SQL errors gracefully
+- Use parameterized queries to prevent SQL injection
+- Close database connections properly
+
+### Markdown Parsing
+- Extract frontmatter using YAML parser
+- Handle malformed frontmatter gracefully
+- Support Obsidian wikilinks: `[[note-name]]` and `[[note-name|display]]`
+- Extract tags from both frontmatter and content body
+- Strip code blocks when extracting tags to avoid false positives
+
+### Testing
+- Write unit tests for utility functions
+- Test edge cases and error conditions
+- Mock external dependencies (file system, database)
+- Run tests before committing: `bun test`
+
+### Before Committing
+- Run `bun run check` for linting (if configured)
+- Run `bun test` for tests
+- Ensure all TypeScript errors are resolved
+- Check that imports are correct
+
+### Commit Format
+Format: `type: brief description`
+
+Types:
+- `feat:` - new feature
+- `fix:` - bug fix
+- `refactor:` - code restructuring
+- `docs:` - documentation changes
+- `test:` - test additions/changes
+- `chore:` - maintenance tasks
+
+Examples:
+- `feat: add block reference support`
+- `fix: resolve link parsing for nested wikilinks`
+- `refactor: extract position calculation to utility`
+
+## Boundaries - Never Modify
+
+- `.secondbrain/` directory (except config.json)
+- `.git/` directory
+- `node_modules/` or lock files
+- Test fixtures unless explicitly requested
+- PRD files during execution
+
+## Obsidian Compatibility
+
+This CLI is designed to be 100% compatible with Obsidian vaults:
+- Support standard Markdown with frontmatter
+- Parse Obsidian wikilinks: `[[note]]` and `[[note|display]]`
+- Extract tags from content: `#tag`
+- Respect Obsidian's file structure
+- Don't modify files in ways that break Obsidian compatibility
+
+## Performance Considerations
+
+- Use batch operations for database queries when possible
+- Cache parsed results when appropriate
+- Avoid reading entire vault into memory
+- Use streaming for large file operations
+- Optimize SQL queries with proper indexes
+
+## Security
+
+- Never expose sensitive data in logs
+- Validate all user inputs
+- Sanitize file paths to prevent directory traversal
+- Use parameterized SQL queries
+- Handle file system errors gracefully

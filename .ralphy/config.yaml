@@ -1,0 +1,37 @@
+# Ralphy config for secondbrain-cli
+# https://github.com/michaelshimeles/ralphy
+
+project:
+  name: "secondbrain-cli"
+  language: "TypeScript"
+  framework: "CLI (Commander.js)"
+
+commands:
+  test: "bun test"
+  lint: "tsc --noEmit"
+  build: "tsc"
+
+rules:
+  - "Keep changes small and focused; one logical change per commit"
+  - "Use TypeScript strict mode; prefer async/await"
+  - "Indentation: tabs (2 space width); line width 100 chars; LF line endings"
+  - "File naming: kebab-case for files, PascalCase for classes, camelCase for functions"
+  - "Group imports: external first, then internal; avoid circular dependencies"
+  - "Use try-catch for async ops; meaningful errors; exit 1 on error, 0 on success"
+  - "Database: use transactions, parameterized queries, handle SQL errors"
+  - "Markdown: support Obsidian wikilinks [[note]] and [[note|display]]; extract tags from frontmatter and body; strip code blocks when extracting tags"
+  - "Commit format: type: description (feat/fix/refactor/docs/test/chore)"
+  - "Obsidian compatible: don't modify files in ways that break Obsidian vaults"
+  - "Don't over-engineer; no dead code; no backwards-compatibility hacks for removed code"
+
+boundaries:
+  never_touch:
+    - ".secondbrain/**"
+    - ".git/**"
+    - "node_modules/**"
+    - "*.lock"
+    - "bun.lockb"
+    - "package-lock.json"
+    - "**/fixtures/**"
+    - "PRD.md"
+    - ".ralphy/**"

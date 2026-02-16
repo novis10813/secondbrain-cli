@@ -31,6 +31,15 @@ export interface HeadingRef {
   position: Pos;
 }
 
+export interface HeadingStructure {
+  level: number;
+  text: string;
+  line: number;
+  column: number;
+  position: Pos;
+  children: HeadingStructure[];
+}
+
 export interface BlockRef {
   blockId: string;
   line: number;
@@ -53,6 +62,7 @@ export interface ParsedNote {
   tags: TagRef[];
   links: LinkRef[];
   headings: HeadingRef[];
+  headingStructure: HeadingStructure[];
   blockRefs: BlockRef[];
   embeds: EmbedRef[];
 }
@@ -80,6 +90,7 @@ export class NoteParser {
       frontmatterPosition
     );
     const headings = this.extractHeadings(body, codeRanges, content, bodyStartIndex);
+    const headingStructure = this.buildHeadingStructure(headings);
     const bodyBlockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
     const embeds = this.extractEmbeds(body, codeRanges, content, bodyStartIndex);
     const blockRefs = this.mergeBlockRefsFromLinks(bodyBlockRefs, links, embeds);
@@ -92,6 +103,7 @@ export class NoteParser {
       tags,
       links,
       headings,
+      headingStructure,
       blockRefs,
       embeds
     };
@@ -362,6 +374,40 @@ export class NoteParser {
       result.push({ level, text, line: pos.line, column: pos.column, position });
     }
     return result;
+  }
+
+  private static buildHeadingStructure(headings: HeadingRef[]): HeadingStructure[] {
+    const root: HeadingStructure[] = [];
+    const stack: HeadingStructure[] = [];
+
+    for (const heading of headings) {
+      const node: HeadingStructure = {
+        level: heading.level,
+        text: heading.text,
+        line: heading.line,
+        column: heading.column,
+        position: heading.position,
+        children: []
+      };
+
+      // Find the appropriate parent: the most recent heading with a lower level
+      while (stack.length > 0 && stack[stack.length - 1].level >= heading.level) {
+        stack.pop();
+      }
+
+      if (stack.length === 0) {
+        // No parent found, add to root
+        root.push(node);
+      } else {
+        // Add as child of the most recent parent
+        stack[stack.length - 1].children.push(node);
+      }
+
+      // Push current node onto stack for potential children
+      stack.push(node);
+    }
+
+    return root;
   }
 
   private static extractBlockRefs(

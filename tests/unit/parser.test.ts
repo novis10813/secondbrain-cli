@@ -179,6 +179,159 @@ Inline \`# not heading\` ignored.`;
       }
     });
 
+    describe('heading structure extraction', () => {
+      it('builds hierarchical structure from flat heading list', () => {
+        const content = `# Chapter 1
+## Section 1.1
+### Subsection 1.1.1
+## Section 1.2
+# Chapter 2
+## Section 2.1`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure).toHaveLength(2);
+        expect(parsed.headingStructure[0].text).toBe('Chapter 1');
+        expect(parsed.headingStructure[0].children).toHaveLength(2);
+        expect(parsed.headingStructure[0].children[0].text).toBe('Section 1.1');
+        expect(parsed.headingStructure[0].children[0].children).toHaveLength(1);
+        expect(parsed.headingStructure[0].children[0].children[0].text).toBe('Subsection 1.1.1');
+        expect(parsed.headingStructure[0].children[1].text).toBe('Section 1.2');
+        expect(parsed.headingStructure[1].text).toBe('Chapter 2');
+        expect(parsed.headingStructure[1].children).toHaveLength(1);
+        expect(parsed.headingStructure[1].children[0].text).toBe('Section 2.1');
+      });
+
+      it('handles multiple root-level headings', () => {
+        const content = `# First
+# Second
+# Third`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure).toHaveLength(3);
+        expect(parsed.headingStructure[0].text).toBe('First');
+        expect(parsed.headingStructure[1].text).toBe('Second');
+        expect(parsed.headingStructure[2].text).toBe('Third');
+        expect(parsed.headingStructure[0].children).toHaveLength(0);
+        expect(parsed.headingStructure[1].children).toHaveLength(0);
+        expect(parsed.headingStructure[2].children).toHaveLength(0);
+      });
+
+      it('handles deep nesting correctly', () => {
+        const content = `# H1
+## H2
+### H3
+#### H4
+##### H5
+###### H6`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure).toHaveLength(1);
+        let node = parsed.headingStructure[0];
+        expect(node.text).toBe('H1');
+        expect(node.children).toHaveLength(1);
+        node = node.children[0];
+        expect(node.text).toBe('H2');
+        expect(node.children).toHaveLength(1);
+        node = node.children[0];
+        expect(node.text).toBe('H3');
+        expect(node.children).toHaveLength(1);
+        node = node.children[0];
+        expect(node.text).toBe('H4');
+        expect(node.children).toHaveLength(1);
+        node = node.children[0];
+        expect(node.text).toBe('H5');
+        expect(node.children).toHaveLength(1);
+        node = node.children[0];
+        expect(node.text).toBe('H6');
+        expect(node.children).toHaveLength(0);
+      });
+
+      it('handles skipped heading levels (e.g., H1 -> H3)', () => {
+        const content = `# H1
+### H3
+## H2
+### H3`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure).toHaveLength(1);
+        expect(parsed.headingStructure[0].text).toBe('H1');
+        expect(parsed.headingStructure[0].children).toHaveLength(2);
+        expect(parsed.headingStructure[0].children[0].text).toBe('H3');
+        expect(parsed.headingStructure[0].children[1].text).toBe('H2');
+        expect(parsed.headingStructure[0].children[1].children).toHaveLength(1);
+        expect(parsed.headingStructure[0].children[1].children[0].text).toBe('H3');
+      });
+
+      it('handles empty headings list', () => {
+        const content = `No headings here
+Just regular text`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headings).toHaveLength(0);
+        expect(parsed.headingStructure).toHaveLength(0);
+      });
+
+      it('preserves heading properties in structure', () => {
+        const content = `# Title
+## Subtitle`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure[0]).toMatchObject({
+          level: 1,
+          text: 'Title',
+          line: 1,
+          column: 1
+        });
+        expect(parsed.headingStructure[0].position).toBeDefined();
+        expect(parsed.headingStructure[0].children[0]).toMatchObject({
+          level: 2,
+          text: 'Subtitle',
+          line: 2,
+          column: 1
+        });
+        expect(parsed.headingStructure[0].children[0].position).toBeDefined();
+      });
+
+      it('handles complex nested structure with multiple branches', () => {
+        const content = `# Main
+## A
+### A1
+### A2
+## B
+### B1
+#### B1a
+### B2
+# Another Main
+## C`;
+
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.headingStructure).toHaveLength(2);
+        const main = parsed.headingStructure[0];
+        expect(main.text).toBe('Main');
+        expect(main.children).toHaveLength(2);
+        expect(main.children[0].text).toBe('A');
+        expect(main.children[0].children).toHaveLength(2);
+        expect(main.children[0].children[0].text).toBe('A1');
+        expect(main.children[0].children[1].text).toBe('A2');
+        expect(main.children[1].text).toBe('B');
+        expect(main.children[1].children).toHaveLength(2);
+        expect(main.children[1].children[0].text).toBe('B1');
+        expect(main.children[1].children[0].children).toHaveLength(1);
+        expect(main.children[1].children[0].children[0].text).toBe('B1a');
+        expect(main.children[1].children[1].text).toBe('B2');
+        expect(parsed.headingStructure[1].text).toBe('Another Main');
+        expect(parsed.headingStructure[1].children).toHaveLength(1);
+        expect(parsed.headingStructure[1].children[0].text).toBe('C');
+      });
+    });
+
     it('extracts block references ^block-id from body', () => {
       const content = `# Doc
 
