@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
-import type { Pos, HeadingCache } from '../types/index.js';
+import type { Pos, HeadingCache, ListItemCache } from '../types/index.js';
 import { rangeToPos } from './position.js';
 
 export interface Position {
@@ -516,6 +516,17 @@ export class NoteParser {
       heading: h.text,
       level: h.level,
       position: h.position
+    }));
+  }
+
+  /**
+   * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
+   * Preserves task status and position information.
+   */
+  static listItemsToCache(listItems: ListItemRef[]): ListItemCache[] {
+    return listItems.map(li => ({
+      task: li.task,
+      position: li.position
     }));
   }
 }

@@ -899,6 +899,45 @@ tags: [x]
     });
   });
 
+  describe('listItemsToCache', () => {
+    it('converts ListItemRef[] to ListItemCache[] with task and position', () => {
+      const content = `# Doc
+
+- [ ] Unchecked task
+- [x] Checked task
+- Regular item`;
+
+      const parsed = NoteParser.parse(content);
+      const cache = NoteParser.listItemsToCache(parsed.listItems);
+
+      expect(cache).toHaveLength(3);
+      expect(cache[0].task).toBeUndefined(); // unchecked
+      expect(cache[0].position).toBeDefined();
+      expect(cache[1].task).toBe('x'); // checked
+      expect(cache[1].position).toBeDefined();
+      expect(cache[2].task).toBeUndefined(); // non-task
+      expect(cache[2].position).toBeDefined();
+    });
+
+    it('handles empty list items array', () => {
+      const cache = NoteParser.listItemsToCache([]);
+      expect(cache).toHaveLength(0);
+    });
+
+    it('preserves position information', () => {
+      const content = `# Doc
+
+- Item with position`;
+
+      const parsed = NoteParser.parse(content);
+      const cache = NoteParser.listItemsToCache(parsed.listItems);
+
+      expect(cache[0].position.start).toBeDefined();
+      expect(cache[0].position.end).toBeDefined();
+      expect(cache[0].position.start.offset).toBeLessThan(cache[0].position.end.offset);
+    });
+  });
+
   describe('heading links support', () => {
     it('extracts heading links like [[note#heading]]', () => {
       const content = `# Doc
