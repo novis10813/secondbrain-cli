@@ -4,6 +4,9 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+const CONFIG_FILE = '.secondbrain/config.json';
+const DB_FILE = '.secondbrain/index.db';
+
 describe('ConfigManager', () => {
   let tempDir: string;
   let configManager: ConfigManager;
@@ -66,6 +69,23 @@ describe('ConfigManager', () => {
       expect(loaded).not.toBeNull();
       expect(loaded?.vaultPath).toBe(tempDir);
       expect(loaded?.dailyNotesFolder).toBe('Daily');
+    });
+
+    it('should return null when config file contains invalid JSON', () => {
+      configManager.init();
+      writeFileSync(join(tempDir, CONFIG_FILE), 'not valid json {', 'utf-8');
+      const loaded = configManager.loadConfig();
+      expect(loaded).toBeNull();
+    });
+  });
+
+  describe('configPath and dbPath getters', () => {
+    it('configPath returns path to config.json under vault', () => {
+      expect(configManager.configPath).toBe(join(tempDir, CONFIG_FILE));
+    });
+
+    it('dbPath returns path to index.db under vault', () => {
+      expect(configManager.dbPath).toBe(join(tempDir, DB_FILE));
     });
   });
 

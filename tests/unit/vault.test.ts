@@ -285,6 +285,23 @@ describe('VaultManager', () => {
     });
   });
 
+  describe('getGraphData', () => {
+    it('returns nodes and edges after sync', async () => {
+      vaultManager.writeNote('a.md', '# A\n\nContent');
+      vaultManager.writeNote('b.md', '# B\n\nLink to [[a]]');
+      await vaultManager.sync();
+
+      const graph = vaultManager.getGraphData();
+      expect(graph.nodes).toBeDefined();
+      expect(graph.edges).toBeDefined();
+      expect(Array.isArray(graph.nodes)).toBe(true);
+      expect(Array.isArray(graph.edges)).toBe(true);
+      expect(graph.nodes.length).toBe(2);
+      expect(graph.nodes.every(n => 'id' in n && 'title' in n && 'path' in n && 'tags' in n)).toBe(true);
+      expect(graph.edges.length).toBeGreaterThanOrEqual(0);
+    });
+  });
+
   describe('getDailyNotePath', () => {
     it('應該回傳正確的每日筆記路徑', () => {
       const date = new Date('2024-01-15');

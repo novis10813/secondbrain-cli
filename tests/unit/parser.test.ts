@@ -79,6 +79,29 @@ title: Linked Note
       expect(parsed.title).toBe('Untitled');
     });
 
+    it('truncates title from first line to 100 characters', () => {
+      const long = 'a'.repeat(150);
+      const content = long + '\n\nrest of body';
+      const parsed = NoteParser.parse(content);
+      expect(parsed.title).toHaveLength(100);
+      expect(parsed.title).toBe('a'.repeat(100));
+    });
+
+    it('treats invalid YAML frontmatter as no frontmatter and uses full content as body', () => {
+      const content = `---
+title: unclosed
+tags: [a
+---
+
+# Real Title
+
+Body.`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.frontmatter).toEqual({});
+      expect(parsed.title).toBe('Real Title');
+      expect(parsed.content).toContain('---');
+    });
+
     it('links include position (line, column)', () => {
       const content = `# Doc
 
@@ -425,6 +448,19 @@ tags: [a, b]
       const link = parsed.links.find(l => l.target === 'x');
       expect(link).toBeDefined();
       expect(link!.line).toBe(3); // body line (first line of body is # T)
+    });
+
+    it('extracts links from frontmatter fields (e.g. string with wikilinks)', () => {
+      const content = `---
+seealso: "[[Note A]] and [[Note B|Label]]"
+---
+
+# Doc
+
+Body.`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.links.some(l => l.target === 'Note A')).toBe(true);
+      expect(parsed.links.some(l => l.target === 'Note B')).toBe(true);
     });
 
     it('extracts embeds ![[path]] and ![[path|display]] with positions', () => {
@@ -973,6 +1009,37 @@ See [[other#Heading#^block123]].`;
       expect(parsed.links[0].target).toBe('other#Heading#^block123');
       // Block ref should also be extracted
       expect(parsed.blockRefs.some(b => b.blockId === 'block123')).toBe(true);
+    });
+  });
+
+  describe('parsedToContentMetadata', () => {
+    it('converts ParsedNote to ContentMetadata with links, tags, headings, blocks', () => {
+      const content = `# Title
+
+See [[target]] and #tag. Text ^block-1.`;
+      const parsed = NoteParser.parse(content);
+      const meta = NoteParser.parsedToContentMetadata(parsed, content);
+
+      expect(meta.links).toHaveLength(1);
+      expect(meta.links![0].link).toBe('target');
+      expect(meta.tags).toHaveLength(1);
+      expect(meta.tags![0].tag).toBe('tag');
+      expect(meta.headings).toHaveLength(1);
+      expect(meta.headings![0].heading).toBe('Title');
+      expect(meta.blocks).toHaveLength(1);
+      expect(meta.blocks![0].id).toBe('block-1');
+    });
+
+    it('includes displayText for link when original content has [[path|display]]', () => {
+      const content = `# Doc
+
+Link [[page|Display Label]].`;
+      const parsed = NoteParser.parse(content);
+      const meta = NoteParser.parsedToContentMetadata(parsed, content);
+
+      expect(meta.links).toHaveLength(1);
+      expect(meta.links![0].displayText).toBe('Display Label');
+      expect(meta.links![0].original).toBe('[[page|Display Label]]');
     });
   });
 });

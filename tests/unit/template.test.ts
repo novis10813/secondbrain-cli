@@ -290,5 +290,27 @@ Participants: {{participants}}`;
       
       expect(missing).toEqual([]);
     });
+
+    it('treats empty string value as missing', () => {
+      const template = '# {{title}}\n\nBy: {{author}}';
+      templateManager.createTemplate('article', template);
+
+      const missing = templateManager.validateRequiredFields('article', {
+        title: 'Test',
+        author: ''
+      });
+
+      expect(missing).toContain('author');
+    });
+
+    it('recognizes variable names with leading underscore', () => {
+      const template = 'Hello {{_internal}} and {{name}}';
+      templateManager.createTemplate('vars', template);
+
+      const variables = templateManager.validateTemplate('vars');
+      expect(variables).toContain('_internal');
+      expect(variables).toContain('name');
+      expect(variables.length).toBe(2);
+    });
   });
 });
