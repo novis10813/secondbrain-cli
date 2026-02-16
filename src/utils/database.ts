@@ -440,11 +440,12 @@ export class DatabaseManager {
 		}));
 	}
 
-	/** Search files by path/basename and optional tags (new structure). */
+	/** Search files by path/basename, optional tags, and optional path prefix (new structure). */
 	searchFiles(
 		query: string,
 		tags?: string[],
-		limit: number = 20
+		limit: number = 20,
+		pathPrefix?: string
 	): Array<{ file: FileInfo; tags: string[] }> {
 		const like = `%${query}%`;
 		let sql = `
@@ -453,6 +454,10 @@ export class DatabaseManager {
 			WHERE (f.path LIKE ? OR f.basename LIKE ?)
 		`;
 		const params: (string | number)[] = [like, like];
+		if (pathPrefix !== undefined && pathPrefix !== '') {
+			sql += ` AND (f.path LIKE ? OR f.parent = ?)`;
+			params.push(`${pathPrefix}%`, pathPrefix);
+		}
 		if (tags && tags.length > 0) {
 			sql += ` AND f.path IN (SELECT file_path FROM tags_with_positions WHERE tag IN (${tags.map(() => '?').join(',')}))`;
 			params.push(...tags);

@@ -183,8 +183,22 @@ describe('VaultManager', () => {
 
     it('應該限制結果數量', () => {
       const results = vaultManager.searchFiles('', undefined, 2);
-      
+
       expect(results.length).toBeLessThanOrEqual(2);
+    });
+
+    it('應該依 path prefix 過濾結果', async () => {
+      vaultManager.writeNote('Daily/2024-01-01.md', '# Daily\n\nNote in Daily');
+      vaultManager.writeNote('Projects/task.md', '# Task\n\nNote in Projects');
+      await vaultManager.sync();
+
+      const dailyResults = vaultManager.searchFiles('', undefined, 20, 'Daily');
+      const projectResults = vaultManager.searchFiles('', undefined, 20, 'Projects');
+
+      expect(dailyResults.every(r => r.file.path.startsWith('Daily'))).toBe(true);
+      expect(projectResults.every(r => r.file.path.startsWith('Projects'))).toBe(true);
+      expect(dailyResults.some(r => r.file.basename === '2024-01-01')).toBe(true);
+      expect(projectResults.some(r => r.file.basename === 'task')).toBe(true);
     });
   });
 

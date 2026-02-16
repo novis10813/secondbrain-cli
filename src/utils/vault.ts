@@ -296,9 +296,10 @@ export class VaultManager {
   searchFiles(
     query: string,
     tags?: string[],
-    limit: number = 20
+    limit: number = 20,
+    pathPrefix?: string
   ): Array<{ file: FileInfo; tags: string[] }> {
-    return this.db.searchFiles(query, tags, limit);
+    return this.db.searchFiles(query, tags, limit, pathPrefix);
   }
 
   getGraphData() {

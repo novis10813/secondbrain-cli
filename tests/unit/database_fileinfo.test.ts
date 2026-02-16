@@ -141,4 +141,40 @@ describe('DatabaseManager FileInfo Operations', () => {
 
     db.close();
   });
+
+  it('should filter searchFiles by path prefix', () => {
+    const db = new DatabaseManager(config);
+    db.upsertFile(
+      {
+        path: 'Daily/note.md',
+        name: 'note.md',
+        basename: 'note',
+        extension: 'md',
+        parent: 'Daily',
+        stat: { ctime: 1000, mtime: 2000, size: 10 }
+      },
+      'h1'
+    );
+    db.upsertFile(
+      {
+        path: 'Projects/note.md',
+        name: 'note.md',
+        basename: 'note',
+        extension: 'md',
+        parent: 'Projects',
+        stat: { ctime: 1000, mtime: 2000, size: 10 }
+      },
+      'h2'
+    );
+
+    const daily = db.searchFiles('', undefined, 20, 'Daily');
+    const projects = db.searchFiles('', undefined, 20, 'Projects');
+
+    expect(daily.length).toBe(1);
+    expect(daily[0].file.path).toBe('Daily/note.md');
+    expect(projects.length).toBe(1);
+    expect(projects[0].file.path).toBe('Projects/note.md');
+
+    db.close();
+  });
 });

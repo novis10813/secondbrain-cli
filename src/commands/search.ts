@@ -5,8 +5,9 @@ import { VaultManager } from '../utils/vault.js';
 export function createSearchCommand(): Command {
   const command = new Command('search')
     .description('Search notes by path/basename and tags')
-    .argument('<query>', 'Search query (matches path and basename)')
+    .argument('[query]', 'Search query (path/basename); omit for tag-only or path-only search', '')
     .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
+    .option('-p, --path <pathPrefix>', 'Restrict to files under this path prefix (e.g. Daily/ or Projects)')
     .option('-l, --limit <limit>', 'Maximum results', '20')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action((query, options) => {
@@ -23,8 +24,9 @@ export function createSearchCommand(): Command {
 
         const tags = options.tags ? options.tags.split(',').map((t: string) => t.trim()) : undefined;
         const limit = parseInt(options.limit);
+        const pathPrefix = options.path?.trim() || undefined;
 
-        const results = vault.searchFiles(query, tags, limit);
+        const results = vault.searchFiles(query ?? '', tags, limit, pathPrefix);
 
         if (options.format === 'json') {
           const output = results.map(({ file, tags: fileTags }) => ({
@@ -34,8 +36,8 @@ export function createSearchCommand(): Command {
           }));
 
           console.log(JSON.stringify({
-            query,
-            filters: { tags, limit },
+            query: query ?? '',
+            filters: { tags, limit, path: pathPrefix },
             results: output,
             total: output.length
           }, null, 2));
