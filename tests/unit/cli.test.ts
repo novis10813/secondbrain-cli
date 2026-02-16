@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'bun:test';
 import { join } from 'path';
+import { readFileSync } from 'fs';
 
 const PROJECT_ROOT = join(import.meta.dir, '..', '..');
 const CLI_ENTRY = join(PROJECT_ROOT, 'src', 'index.ts');
+const README_PATH = join(PROJECT_ROOT, 'README.md');
 
 const EXPECTED_COMMANDS = [
 	'init',
@@ -46,6 +48,16 @@ describe('CLI commands', () => {
 			const { exitCode, stderr } = await runCli([ cmd, '--help' ]);
 			expect(exitCode, `sb ${cmd} --help should exit 0`).toBe(0);
 			expect(stderr, `sb ${cmd} --help should not write to stderr`).toBe('');
+		}
+	});
+
+	it('README documents all CLI commands', () => {
+		const readme = readFileSync(README_PATH, 'utf-8');
+		for (const cmd of EXPECTED_COMMANDS) {
+			expect(
+				readme.includes(`sb ${cmd}`) || readme.includes(` ${cmd} `),
+				`README should document 'sb ${cmd}'`
+			).toBe(true);
 		}
 	});
 });

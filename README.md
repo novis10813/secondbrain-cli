@@ -43,7 +43,7 @@ sb capture "這是筆記內容" --title="我的筆記" --tags="idea,work"
 sb search "API 設計" --tags="tech" --format=json
 
 # 取得 backlinks
-sb backlinks <note-id>
+sb backlinks <path-or-id>
 
 # 找孤兒筆記
 sb orphans
@@ -73,8 +73,8 @@ sb search "關鍵字" \                 # 搜尋
   --limit=10 \
   --format=json
 
-sb get <note-id>                     # 取得單一筆記
-sb backlinks <note-id>               # 取得 backlinks
+sb get <path-or-id>                  # 取得單一筆記（路徑或檔名）
+sb backlinks <path-or-id>            # 取得 backlinks
 ```
 
 ### Vault 維護
@@ -83,6 +83,7 @@ sb backlinks <note-id>               # 取得 backlinks
 sb sync                              # 同步索引
 sb stats                             # 統計資訊
 sb orphans                           # 孤兒筆記
+sb migrate                           # 從舊 schema 遷移至新 schema（files + content_metadata）
 ```
 
 ## 資料架構
@@ -109,6 +110,9 @@ bun run dev
 
 # 建置
 bun run build
+
+# 檢查型別
+bun run lint
 
 # 執行測試
 bun test
