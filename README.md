@@ -21,6 +21,15 @@ npm login --scope=@novis10813 --registry=https://npm.pkg.github.com
 npm install -g @novis10813/secondbrain-cli
 ```
 
+> 注意：此 CLI 目前使用 `bun:sqlite`，因此執行時需要 **Bun runtime**。如果你用 `npm` 安裝但系統沒有 `bun`，`sb` 會無法執行。
+
+如果你用 `bun` 從 GitHub 安裝並看到 `Blocked ... postinstall/prepare`，需要先信任再重裝一次：
+
+```bash
+bun pm -g trust @novis10813/secondbrain-cli
+bun add -g github:novis10813/secondbrain-cli#<tag>
+```
+
 ## 快速開始
 
 ```bash

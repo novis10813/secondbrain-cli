@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { Command } from 'commander';
 import { createInitCommand } from './commands/init.js';
@@ -10,13 +10,14 @@ import { createSyncCommand } from './commands/sync.js';
 import { createStatsCommand } from './commands/stats.js';
 import { createOrphansCommand } from './commands/orphans.js';
 import { createConfigCommand } from './commands/config.js';
+import pkg = require('../package.json');
 
 const program = new Command();
 
 program
   .name('sb')
   .description('SecondBrain CLI - A tool for LLM agents to manage Obsidian vaults')
-  .version('0.1.0');
+  .version(pkg.version);
 
 // Add commands
 program.addCommand(createInitCommand());
