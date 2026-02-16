@@ -325,6 +325,15 @@ export class VaultManager {
   // Obsidian-style API methods
 
   /**
+   * Get all markdown files in the vault (Obsidian-style API).
+   * Equivalent to Obsidian's Vault.getMarkdownFiles().
+   * @returns Array of FileInfo for every .md file in the vault
+   */
+  getMarkdownFiles(): FileInfo[] {
+    return this.db.getAllFiles();
+  }
+
+  /**
    * Get FileInfo by path (Obsidian-style API).
    * @param path Relative path from vault root
    * @returns FileInfo or null if not found

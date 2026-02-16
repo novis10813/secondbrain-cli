@@ -369,6 +369,25 @@ describe('VaultManager', () => {
       await vaultManager.sync();
     });
 
+    describe('getMarkdownFiles', () => {
+      it('should return all markdown files in vault', () => {
+        const files = vaultManager.getMarkdownFiles();
+        expect(files.length).toBe(4);
+        const paths = files.map(f => f.path).sort();
+        expect(paths).toEqual(['folder/nested.md', 'note with spaces.md', 'simple.md', 'with-heading.md']);
+      });
+
+      it('should return FileInfo with path, name, basename, extension', () => {
+        const files = vaultManager.getMarkdownFiles();
+        const simple = files.find(f => f.path === 'simple.md');
+        expect(simple).not.toBeUndefined();
+        expect(simple?.path).toBe('simple.md');
+        expect(simple?.name).toBe('simple.md');
+        expect(simple?.basename).toBe('simple');
+        expect(simple?.extension).toBe('md');
+      });
+    });
+
     describe('getFileByPath', () => {
       it('should return FileInfo for existing file', () => {
         const file = vaultManager.getFileByPath('simple.md');
