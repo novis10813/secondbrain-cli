@@ -1,6 +1,9 @@
 import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
+import type { Pos } from '../types/index.js';
+import { rangeToPos } from './position.js';
+
 export interface Position {
   line: number;
   column: number;
@@ -10,12 +13,14 @@ export interface LinkRef {
   target: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 export interface TagRef {
   name: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 export interface HeadingRef {
@@ -23,24 +28,28 @@ export interface HeadingRef {
   text: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 export interface BlockRef {
   blockId: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 export interface EmbedRef {
   target: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 export interface ParsedNote {
   title: string;
   content: string;
   frontmatter: Record<string, unknown>;
+  frontmatterPosition?: Pos;
   tags: TagRef[];
   links: LinkRef[];
   headings: HeadingRef[];
@@ -50,19 +59,35 @@ export interface ParsedNote {
 
 export class NoteParser {
   static parse(content: string): ParsedNote {
-    const { frontmatter, body } = this.extractFrontmatter(content);
+    const { frontmatter, body, bodyStartIndex } = this.extractFrontmatter(content);
     const codeRanges = this.getCodeBlockRanges(body);
     const title = this.extractTitle(body);
-    const tags = this.extractTags(frontmatter, body, codeRanges);
-    const links = this.extractLinks(frontmatter, body);
-    const headings = this.extractHeadings(body, codeRanges);
-    const blockRefs = this.extractBlockRefs(body, codeRanges);
-    const embeds = this.extractEmbeds(body);
+    const frontmatterPosition =
+      bodyStartIndex > 0 ? rangeToPos(content, 0, bodyStartIndex) : undefined;
+    const tags = this.extractTags(
+      frontmatter,
+      body,
+      codeRanges,
+      content,
+      bodyStartIndex,
+      frontmatterPosition
+    );
+    const links = this.extractLinks(
+      frontmatter,
+      body,
+      content,
+      bodyStartIndex,
+      frontmatterPosition
+    );
+    const headings = this.extractHeadings(body, codeRanges, content, bodyStartIndex);
+    const blockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
+    const embeds = this.extractEmbeds(body, content, bodyStartIndex);
 
     return {
       title,
       content: body,
       frontmatter,
+      frontmatterPosition,
       tags,
       links,
       headings,
@@ -103,7 +128,9 @@ export class NoteParser {
     return createHash('sha256').update(content).digest('hex');
   }
 
-  private static extractFrontmatter(content: string): { frontmatter: Record<string, unknown>; body: string } {
+  private static extractFrontmatter(
+    content: string
+  ): { frontmatter: Record<string, unknown>; body: string; bodyStartIndex: number } {
     const frontmatterRegex = /^---\s*\n([\s\S]*?)\n---\s*\n?/;
     const match = content.match(frontmatterRegex);
 
@@ -111,13 +138,13 @@ export class NoteParser {
       try {
         const frontmatter = yaml.parse(match[1]) || {};
         const body = content.slice(match[0].length);
-        return { frontmatter, body };
+        return { frontmatter, body, bodyStartIndex: match[0].length };
       } catch {
         // Invalid YAML, treat as no frontmatter
       }
     }
 
-    return { frontmatter: {}, body: content };
+    return { frontmatter: {}, body: content, bodyStartIndex: 0 };
   }
 
   private static extractTitle(content: string): string {
@@ -139,11 +166,15 @@ export class NoteParser {
   private static extractTags(
     frontmatter: Record<string, unknown>,
     body: string,
-    codeRanges: Array<[number, number]>
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number,
+    frontmatterPosition?: Pos
   ): TagRef[] {
     const seen = new Set<string>();
     const result: TagRef[] = [];
     const fmLine = { line: 1, column: 1 };
+    const fmPosition = frontmatterPosition ?? rangeToPos(content, 0, Math.min(1, content.length));
 
     if (frontmatter.tags) {
       if (Array.isArray(frontmatter.tags)) {
@@ -151,7 +182,7 @@ export class NoteParser {
           const name = String(tag).replace(/^#/, '');
           if (name && !seen.has(name)) {
             seen.add(name);
-            result.push({ name, ...fmLine });
+            result.push({ name, ...fmLine, position: fmPosition });
           }
         }
       } else if (typeof frontmatter.tags === 'string') {
@@ -159,7 +190,7 @@ export class NoteParser {
           const name = tag.replace(/^#/, '');
           if (name && !seen.has(name)) {
             seen.add(name);
-            result.push({ name, ...fmLine });
+            result.push({ name, ...fmLine, position: fmPosition });
           }
         }
       }
@@ -177,21 +208,34 @@ export class NoteParser {
       if (seen.has(name)) continue;
       seen.add(name);
       const pos = this.indexToPosition(body, match.index);
-      result.push({ name, line: pos.line, column: pos.column });
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ name, line: pos.line, column: pos.column, position });
     }
 
     return result;
   }
 
-  private static extractLinks(frontmatter: Record<string, unknown>, body: string): LinkRef[] {
+  private static extractLinks(
+    frontmatter: Record<string, unknown>,
+    body: string,
+    content: string,
+    bodyStartIndex: number,
+    frontmatterPosition?: Pos
+  ): LinkRef[] {
     const result: LinkRef[] = [];
     const seen = new Set<string>();
     const fmPos = { line: 1, column: 1 };
+    const fmPosition =
+      frontmatterPosition ?? rangeToPos(content, 0, Math.min(1, content.length));
 
     this.extractLinksFromObject(frontmatter, (target) => {
       if (!seen.has(target)) {
         seen.add(target);
-        result.push({ target, ...fmPos });
+        result.push({ target, ...fmPos, position: fmPosition });
       }
     });
 
@@ -203,13 +247,22 @@ export class NoteParser {
       if (seen.has(target)) continue;
       seen.add(target);
       const pos = this.indexToPosition(body, match.index);
-      result.push({ target, line: pos.line, column: pos.column });
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ target, line: pos.line, column: pos.column, position });
     }
 
     return result;
   }
 
-  private static extractEmbeds(body: string): EmbedRef[] {
+  private static extractEmbeds(
+    body: string,
+    content: string,
+    bodyStartIndex: number
+  ): EmbedRef[] {
     const result: EmbedRef[] = [];
     const seen = new Set<string>();
     // Obsidian embeds: ![[path]] or ![[path|display]]
@@ -220,7 +273,12 @@ export class NoteParser {
       if (seen.has(target)) continue;
       seen.add(target);
       const pos = this.indexToPosition(body, match.index);
-      result.push({ target, line: pos.line, column: pos.column });
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ target, line: pos.line, column: pos.column, position });
     }
     return result;
   }
@@ -241,7 +299,9 @@ export class NoteParser {
 
   private static extractHeadings(
     body: string,
-    codeRanges: Array<[number, number]>
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number
   ): HeadingRef[] {
     const result: HeadingRef[] = [];
     const headingRegex = /^(#{1,6})\s+(.+)$/gm;
@@ -251,14 +311,21 @@ export class NoteParser {
       const level = match[1].length;
       const text = match[2].trim();
       const pos = this.indexToPosition(body, match.index);
-      result.push({ level, text, line: pos.line, column: pos.column });
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ level, text, line: pos.line, column: pos.column, position });
     }
     return result;
   }
 
   private static extractBlockRefs(
     body: string,
-    codeRanges: Array<[number, number]>
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number
   ): BlockRef[] {
     const result: BlockRef[] = [];
     const seen = new Set<string>();
@@ -271,7 +338,12 @@ export class NoteParser {
       if (seen.has(blockId)) continue;
       seen.add(blockId);
       const pos = this.indexToPosition(body, match.index);
-      result.push({ blockId, line: pos.line, column: pos.column });
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ blockId, line: pos.line, column: pos.column, position });
     }
     return result;
   }

@@ -120,9 +120,9 @@ Text with #foo and #bar/baz.`;
       const parsed = NoteParser.parse(content);
 
       expect(parsed.headings).toHaveLength(3);
-      expect(parsed.headings[0]).toEqual({ level: 1, text: 'One', line: 1, column: 1 });
-      expect(parsed.headings[1]).toEqual({ level: 2, text: 'Two', line: 3, column: 1 });
-      expect(parsed.headings[2]).toEqual({ level: 3, text: 'Three', line: 5, column: 1 });
+      expect(parsed.headings[0]).toMatchObject({ level: 1, text: 'One', line: 1, column: 1 });
+      expect(parsed.headings[1]).toMatchObject({ level: 2, text: 'Two', line: 3, column: 1 });
+      expect(parsed.headings[2]).toMatchObject({ level: 3, text: 'Three', line: 5, column: 1 });
     });
 
     it('headings with frontmatter use body-relative line numbers', () => {
@@ -289,6 +289,105 @@ First [[a]] then ![[b]] then [[c]].`;
       expect(embedB).toBeDefined();
       expect(parsed.links).toHaveLength(2);
       expect(parsed.embeds).toHaveLength(1);
+    });
+  });
+
+  describe('position extraction', () => {
+    it('links have position with start/end Loc and offset', () => {
+      const content = `# Doc
+
+See [[First]] here.`;
+      const parsed = NoteParser.parse(content);
+      const link = parsed.links.find(l => l.target === 'First')!;
+      expect(link.position).toBeDefined();
+      expect(link.position.start).toMatchObject({ line: 2, col: 4 });
+      expect(link.position.end).toMatchObject({ line: 2, col: 13 });
+      expect(link.position.end.offset).toBeGreaterThan(link.position.start.offset);
+    });
+
+    it('tags have position with start/end Loc and offset', () => {
+      const content = `# Doc
+
+Text with #foo and #bar.`;
+      const parsed = NoteParser.parse(content);
+      const tag = parsed.tags.find(t => t.name === 'foo')!;
+      expect(tag.position).toBeDefined();
+      expect(tag.position.start.line).toBe(2);
+      expect(tag.position.end.line).toBe(2);
+      expect(tag.position.end.offset).toBeGreaterThan(tag.position.start.offset);
+    });
+
+    it('headings have position with start/end Loc and offset', () => {
+      const content = `# Title
+
+Body`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.headings[0].position).toBeDefined();
+      expect(parsed.headings[0].position.start).toMatchObject({ line: 0, col: 0 });
+      expect(parsed.headings[0].position.end.offset).toBeGreaterThan(
+        parsed.headings[0].position.start.offset
+      );
+    });
+
+    it('block refs have position with start/end Loc and offset', () => {
+      const content = `# Doc
+
+Text ^block1 more.`;
+      const parsed = NoteParser.parse(content);
+      const block = parsed.blockRefs.find(b => b.blockId === 'block1')!;
+      expect(block.position).toBeDefined();
+      expect(block.position.start).toMatchObject({ line: 2, col: 5 });
+      expect(block.position.end.offset).toBeGreaterThan(block.position.start.offset);
+    });
+
+    it('embeds have position with start/end Loc and offset', () => {
+      const content = `# Doc
+
+![[image.png]]`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.embeds[0].position).toBeDefined();
+      expect(parsed.embeds[0].position.start).toMatchObject({ line: 2, col: 0 });
+      expect(parsed.embeds[0].position.end.offset).toBeGreaterThan(
+        parsed.embeds[0].position.start.offset
+      );
+    });
+
+    it('frontmatterPosition is set when frontmatter exists', () => {
+      const content = `---
+tags: [a]
+---
+
+# Title`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.frontmatterPosition).toBeDefined();
+      expect(parsed.frontmatterPosition!.start).toMatchObject({
+        line: 0,
+        col: 0,
+        offset: 0
+      });
+      expect(parsed.frontmatterPosition!.end.offset).toBeGreaterThan(0);
+    });
+
+    it('frontmatterPosition is undefined when no frontmatter', () => {
+      const content = `# Title
+
+Body`;
+      const parsed = NoteParser.parse(content);
+      expect(parsed.frontmatterPosition).toBeUndefined();
+    });
+
+    it('body element positions are content-relative (after frontmatter)', () => {
+      const content = `---
+tags: [x]
+---
+
+# H
+
+[[link]]`;
+      const parsed = NoteParser.parse(content);
+      const link = parsed.links.find(l => l.target === 'link')!;
+      // Body starts after frontmatter; link position offset is in full content
+      expect(link.position.start.offset).toBeGreaterThan(parsed.frontmatterPosition!.end.offset);
     });
   });
 
