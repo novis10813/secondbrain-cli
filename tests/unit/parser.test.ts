@@ -856,4 +856,84 @@ tags: [x]
       expect(content).toContain('今天的筆記');
     });
   });
+
+  describe('headingsToCache', () => {
+    it('converts HeadingRef[] to HeadingCache[] with heading property', () => {
+      const content = `# Title
+## Section
+### Subsection`;
+      const parsed = NoteParser.parse(content);
+      const cache = NoteParser.headingsToCache(parsed.headings);
+
+      expect(cache).toHaveLength(3);
+      expect(cache[0]).toMatchObject({
+        heading: 'Title',
+        level: 1,
+        position: parsed.headings[0].position
+      });
+      expect(cache[1]).toMatchObject({
+        heading: 'Section',
+        level: 2,
+        position: parsed.headings[1].position
+      });
+      expect(cache[2]).toMatchObject({
+        heading: 'Subsection',
+        level: 3,
+        position: parsed.headings[2].position
+      });
+    });
+
+    it('handles empty headings array', () => {
+      const cache = NoteParser.headingsToCache([]);
+      expect(cache).toHaveLength(0);
+    });
+
+    it('preserves position information', () => {
+      const content = `# Test Heading`;
+      const parsed = NoteParser.parse(content);
+      const cache = NoteParser.headingsToCache(parsed.headings);
+
+      expect(cache[0].position).toBeDefined();
+      expect(cache[0].position.start).toEqual(parsed.headings[0].position.start);
+      expect(cache[0].position.end).toEqual(parsed.headings[0].position.end);
+    });
+  });
+
+  describe('heading links support', () => {
+    it('extracts heading links like [[note#heading]]', () => {
+      const content = `# Doc
+
+See [[other#Section Title]] and [[note#Another Heading]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.links).toHaveLength(2);
+      expect(parsed.links[0].target).toBe('other#Section Title');
+      expect(parsed.links[1].target).toBe('note#Another Heading');
+    });
+
+    it('extracts heading links with display text [[note#heading|display]]', () => {
+      const content = `# Doc
+
+Link [[page#Section|Custom Text]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.links).toHaveLength(1);
+      expect(parsed.links[0].target).toBe('page#Section');
+    });
+
+    it('extracts heading links with block refs [[note#heading#^block-id]]', () => {
+      const content = `# Doc
+
+See [[other#Heading#^block123]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.links).toHaveLength(1);
+      expect(parsed.links[0].target).toBe('other#Heading#^block123');
+      // Block ref should also be extracted
+      expect(parsed.blockRefs.some(b => b.blockId === 'block123')).toBe(true);
+    });
+  });
 });

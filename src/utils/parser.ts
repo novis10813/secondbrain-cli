@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
-import type { Pos } from '../types/index.js';
+import type { Pos, HeadingCache } from '../types/index.js';
 import { rangeToPos } from './position.js';
 
 export interface Position {
@@ -505,5 +505,17 @@ export class NoteParser {
       type: 'daily-note'
     };
     return this.generateNoteContent(dateStr, content, frontmatter);
+  }
+
+  /**
+   * Convert HeadingRef[] to HeadingCache[] for ContentMetadata.
+   * Maps `text` property to `heading` property.
+   */
+  static headingsToCache(headings: HeadingRef[]): HeadingCache[] {
+    return headings.map(h => ({
+      heading: h.text,
+      level: h.level,
+      position: h.position
+    }));
   }
 }
