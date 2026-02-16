@@ -80,8 +80,9 @@ export class NoteParser {
       frontmatterPosition
     );
     const headings = this.extractHeadings(body, codeRanges, content, bodyStartIndex);
-    const blockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
+    const bodyBlockRefs = this.extractBlockRefs(body, codeRanges, content, bodyStartIndex);
     const embeds = this.extractEmbeds(body, content, bodyStartIndex);
+    const blockRefs = this.mergeBlockRefsFromLinks(bodyBlockRefs, links, embeds);
 
     return {
       title,
@@ -94,6 +95,46 @@ export class NoteParser {
       blockRefs,
       embeds
     };
+  }
+
+  /** Extract block ID from link/embed target like "path#^block-id" or "path#heading#^block-id". */
+  private static parseBlockIdFromTarget(target: string): string | null {
+    const m = target.match(/#\^([a-zA-Z0-9_-]+)$/);
+    return m ? m[1] : null;
+  }
+
+  private static mergeBlockRefsFromLinks(
+    bodyBlockRefs: BlockRef[],
+    links: LinkRef[],
+    embeds: EmbedRef[]
+  ): BlockRef[] {
+    const result = [...bodyBlockRefs];
+    const seen = new Set(bodyBlockRefs.map(b => b.blockId));
+    for (const link of links) {
+      const blockId = this.parseBlockIdFromTarget(link.target);
+      if (blockId && !seen.has(blockId)) {
+        seen.add(blockId);
+        result.push({
+          blockId,
+          line: link.line,
+          column: link.column,
+          position: link.position
+        });
+      }
+    }
+    for (const embed of embeds) {
+      const blockId = this.parseBlockIdFromTarget(embed.target);
+      if (blockId && !seen.has(blockId)) {
+        seen.add(blockId);
+        result.push({
+          blockId,
+          line: embed.line,
+          column: embed.column,
+          position: embed.position
+        });
+      }
+    }
+    return result;
   }
 
   private static indexToPosition(content: string, index: number): Position {

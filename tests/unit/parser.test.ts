@@ -230,6 +230,33 @@ Inline \`^also-fake\` ignored.`;
       expect(parsed.blockRefs[0].blockId).toBe('real');
     });
 
+    it('extracts block refs from wikilink targets [[path#^block-id]]', () => {
+      const content = `# Doc
+
+See [[other#^abc123]] and [[note#^xyz-99]].`;
+
+      const parsed = NoteParser.parse(content);
+      expect(parsed.links.map(l => l.target)).toEqual(['other#^abc123', 'note#^xyz-99']);
+      expect(parsed.blockRefs.map(b => b.blockId).sort()).toEqual(['abc123', 'xyz-99']);
+    });
+
+    it('extracts block refs from embed targets ![[path#^block-id]]', () => {
+      const content = `# Doc
+
+![[page#^embed-block]].`;
+
+      const parsed = NoteParser.parse(content);
+      expect(parsed.embeds[0].target).toBe('page#^embed-block');
+      expect(parsed.blockRefs.map(b => b.blockId)).toContain('embed-block');
+    });
+
+    it('deduplicates block ref from both body and link', () => {
+      const content = 'Ref ^id and link [[x#^id]].';
+      const parsed = NoteParser.parse(content);
+      expect(parsed.blockRefs).toHaveLength(1);
+      expect(parsed.blockRefs[0].blockId).toBe('id');
+    });
+
     it('frontmatter tags have position line 1, body link has body-relative line', () => {
       const content = `---
 tags: [a, b]
