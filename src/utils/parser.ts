@@ -51,11 +51,12 @@ export interface ParsedNote {
 export class NoteParser {
   static parse(content: string): ParsedNote {
     const { frontmatter, body } = this.extractFrontmatter(content);
+    const codeRanges = this.getCodeBlockRanges(body);
     const title = this.extractTitle(body);
-    const tags = this.extractTags(frontmatter, body);
+    const tags = this.extractTags(frontmatter, body, codeRanges);
     const links = this.extractLinks(frontmatter, body);
-    const headings = this.extractHeadings(body);
-    const blockRefs = this.extractBlockRefs(body);
+    const headings = this.extractHeadings(body, codeRanges);
+    const blockRefs = this.extractBlockRefs(body, codeRanges);
     const embeds = this.extractEmbeds(body);
 
     return {
@@ -135,7 +136,11 @@ export class NoteParser {
     return 'Untitled';
   }
 
-  private static extractTags(frontmatter: Record<string, unknown>, body: string): TagRef[] {
+  private static extractTags(
+    frontmatter: Record<string, unknown>,
+    body: string,
+    codeRanges: Array<[number, number]>
+  ): TagRef[] {
     const seen = new Set<string>();
     const result: TagRef[] = [];
     const fmLine = { line: 1, column: 1 };
@@ -160,7 +165,6 @@ export class NoteParser {
       }
     }
 
-    const codeRanges = this.getCodeBlockRanges(body);
     const tagRegex = /#([\w/-]+)/g;
     let match;
     while ((match = tagRegex.exec(body)) !== null) {
@@ -235,9 +239,11 @@ export class NoteParser {
     }
   }
 
-  private static extractHeadings(body: string): HeadingRef[] {
+  private static extractHeadings(
+    body: string,
+    codeRanges: Array<[number, number]>
+  ): HeadingRef[] {
     const result: HeadingRef[] = [];
-    const codeRanges = this.getCodeBlockRanges(body);
     const headingRegex = /^(#{1,6})\s+(.+)$/gm;
     let match;
     while ((match = headingRegex.exec(body)) !== null) {
@@ -250,10 +256,12 @@ export class NoteParser {
     return result;
   }
 
-  private static extractBlockRefs(body: string): BlockRef[] {
+  private static extractBlockRefs(
+    body: string,
+    codeRanges: Array<[number, number]>
+  ): BlockRef[] {
     const result: BlockRef[] = [];
     const seen = new Set<string>();
-    const codeRanges = this.getCodeBlockRanges(body);
     // Obsidian block ref: ^block-id (alphanumeric, hyphens, underscores)
     const blockRefRegex = /\^([a-zA-Z0-9_-]+)/g;
     let match;
