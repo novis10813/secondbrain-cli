@@ -3,6 +3,7 @@ declare module 'bun:sqlite' {
     constructor(path: string);
     exec(sql: string): void;
     prepare(sql: string): Statement;
+    transaction<T extends (...args: any[]) => any>(fn: T): T;
     close(): void;
   }
 

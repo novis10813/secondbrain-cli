@@ -1,6 +1,8 @@
-import { basename, extname } from 'path';
+import { basename, extname, dirname } from 'path';
 import type { Note, Config, GraphData, FileInfo, ContentMetadata } from '../types/index.js';
 import { Database } from 'bun:sqlite';
+import { NoteParser } from './parser.js';
+import * as yaml from 'yaml';
 
 export class DatabaseManager {
   private db: Database;
@@ -221,6 +223,97 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_blocks_pos_file ON blocks_with_positions(file_path);
       CREATE INDEX IF NOT EXISTS idx_embeds_pos_file ON embeds_with_positions(file_path);
     `);
+  }
+
+  /**
+   * Migrate data from old schema (notes table) to new schema (files + content_metadata tables).
+   * Reads existing notes, extracts positions from content, and migrates to new structure.
+   * @returns Migration statistics: { migrated: number, skipped: number, errors: number }
+   */
+  migrateFromOldSchema(): { migrated: number; skipped: number; errors: number } {
+    let migrated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    // Get all notes from old table
+    const notes = this.getAllNotes();
+    if (notes.length === 0) {
+      return { migrated: 0, skipped: 0, errors: 0 };
+    }
+
+    for (const note of notes) {
+      try {
+        // Check if already migrated (file exists in new schema)
+        const existingFile = this.getFileByPath(note.path);
+        if (existingFile) {
+          skipped++;
+          continue;
+        }
+
+        // Create FileInfo from note data
+        const ext = extname(note.path) || '.md';
+        const name = basename(note.path);
+        const basenameWithoutExt = basename(note.path, ext) || basename(note.path);
+        const parentDir = dirname(note.path);
+        const parent = parentDir === '.' ? null : parentDir;
+
+        // Use stat from note if available, otherwise use defaults
+        const ctime = note.stat?.ctime ?? Date.now();
+        const mtime = note.stat?.mtime ?? Date.now();
+        const size = note.stat?.size ?? note.content.length;
+
+        const fileInfo: FileInfo = {
+          path: note.path,
+          name,
+          basename: basenameWithoutExt,
+          extension: ext.replace(/^\./, ''), // Remove leading dot
+          parent,
+          stat: {
+            ctime,
+            mtime,
+            size
+          }
+        };
+
+        // Parse content to extract positions
+        const fullContent = this.reconstructFullContent(note);
+        const parsed = NoteParser.parse(fullContent);
+        const contentMetadata = NoteParser.parsedToContentMetadata(parsed, fullContent);
+
+        // Upsert FileInfo and ContentMetadata
+        this.upsertFile(fileInfo, note.hash);
+        this.upsertContentMetadata(note.path, contentMetadata, note.hash);
+
+        migrated++;
+      } catch (error) {
+        errors++;
+        console.error(`Error migrating note ${note.path}:`, error);
+      }
+    }
+
+    return { migrated, skipped, errors };
+  }
+
+  /**
+   * Reconstruct full content from note (including frontmatter).
+   * The note.content field contains the body, so we need to reconstruct
+   * the full content with frontmatter for accurate position extraction.
+   */
+  private reconstructFullContent(note: Note): string {
+    // If frontmatter exists, reconstruct YAML frontmatter
+    const hasFrontmatter = Object.keys(note.frontmatter).length > 0;
+    if (hasFrontmatter) {
+      try {
+        const frontmatterStr = yaml.stringify(note.frontmatter).trimEnd();
+        // Ensure proper YAML frontmatter format with newlines
+        return `---\n${frontmatterStr}\n---\n${note.content}`;
+      } catch (error) {
+        // If YAML stringify fails, just use content without frontmatter
+        console.warn(`Failed to stringify frontmatter for ${note.path}, using content only`);
+        return note.content;
+      }
+    }
+    return note.content;
   }
 
   close(): void {

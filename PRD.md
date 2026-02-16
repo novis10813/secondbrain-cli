@@ -98,14 +98,14 @@ Enhance SecondBrain CLI to fully align with Obsidian's metadata architecture, im
   - [ ] Support display text: `![[image.png|alt text]]`
   - [ ] Add tests for embed extraction; run `bun test`
 
-- [ ] Implement heading structure extraction
+- [x] Implement heading structure extraction
   - [ ] Extract all headings (H1-H6)
   - [ ] Store heading levels
   - [ ] Store heading text and positions
   - [ ] Support heading links: `[[note#heading]]`
   - [ ] Add tests for heading extraction; run `bun test`
 
-- [ ] Implement list structure extraction (optional, Phase 3.5)
+- [x] Implement list structure extraction (optional, Phase 3.5)
   - [ ] Extract list items with hierarchy
   - [ ] Track task status (checkbox)
   - [ ] Store list item positions
@@ -113,14 +113,14 @@ Enhance SecondBrain CLI to fully align with Obsidian's metadata architecture, im
 
 ### Phase 4: Database Integration
 
-- [ ] Update `DatabaseManager` class
+- [x] Update `DatabaseManager` class
   - [ ] Add methods for `FileInfo` operations
   - [ ] Add methods for `ContentMetadata` operations
   - [ ] Update `upsertNote` to use new structure
   - [ ] Add batch operations for performance
   - [ ] Add tests for DatabaseManager new methods; run `bun test`
 
-- [ ] Update `VaultManager` class
+- [x] Update `VaultManager` class
   - [ ] Separate file info creation from content parsing
   - [ ] Use new metadata structure
   - [ ] Update sync process to use new schema
