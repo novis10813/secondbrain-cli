@@ -83,16 +83,44 @@ export class DatabaseManager {
   }
 
   private updateLinks(noteId: string, targetIds: string[]): void {
-    // Delete existing links
-    this.db.prepare('DELETE FROM links WHERE source_id = ?').run(noteId);
-
-    // Insert new links
-    const insertStmt = this.db.prepare('INSERT OR IGNORE INTO links (source_id, target_id) VALUES (?, ?)');
-    for (const targetId of targetIds) {
-      // Only insert if target exists
-      const targetExists = this.db.prepare('SELECT 1 FROM notes WHERE id = ?').get(targetId);
-      if (targetExists) {
-        insertStmt.run(noteId, targetId);
+    // Get existing links
+    const existingLinks = this.db.prepare('SELECT target_id FROM links WHERE source_id = ?')
+      .all(noteId)
+      .map((row: any) => row.target_id);
+    
+    // Calculate diff
+    const existingSet = new Set(existingLinks);
+    const newSet = new Set(targetIds);
+    
+    // Links to add (in newSet but not in existingSet)
+    const toAdd = targetIds.filter(id => !existingSet.has(id));
+    
+    // Links to remove (in existingSet but not in newSet)
+    const toRemove = existingLinks.filter(id => !newSet.has(id));
+    
+    // Skip if no changes
+    if (toAdd.length === 0 && toRemove.length === 0) {
+      return;
+    }
+    
+    // Remove links that no longer exist
+    if (toRemove.length > 0) {
+      const placeholders = toRemove.map(() => '?').join(',');
+      this.db.prepare(`DELETE FROM links WHERE source_id = ? AND target_id IN (${placeholders})`)
+        .run(noteId, ...toRemove);
+    }
+    
+    // Add new links (only if target exists)
+    if (toAdd.length > 0) {
+      const insertStmt = this.db.prepare('INSERT OR IGNORE INTO links (source_id, target_id) VALUES (?, ?)');
+      const targetExistsStmt = this.db.prepare('SELECT 1 FROM notes WHERE id = ?');
+      
+      for (const targetId of toAdd) {
+        // Only insert if target exists
+        const targetExists = targetExistsStmt.get(targetId);
+        if (targetExists) {
+          insertStmt.run(noteId, targetId);
+        }
       }
     }
   }
