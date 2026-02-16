@@ -440,12 +440,14 @@ export class DatabaseManager {
 		}));
 	}
 
-	/** Search files by path/basename, optional tags, and optional path prefix (new structure). */
+	/** Search files by path/basename, optional tags, path prefix, links-to target, or heading (new structure). */
 	searchFiles(
 		query: string,
 		tags?: string[],
 		limit: number = 20,
-		pathPrefix?: string
+		pathPrefix?: string,
+		linksToPath?: string,
+		headingQuery?: string
 	): Array<{ file: FileInfo; tags: string[] }> {
 		const like = `%${query}%`;
 		let sql = `
@@ -461,6 +463,14 @@ export class DatabaseManager {
 		if (tags && tags.length > 0) {
 			sql += ` AND f.path IN (SELECT file_path FROM tags_with_positions WHERE tag IN (${tags.map(() => '?').join(',')}))`;
 			params.push(...tags);
+		}
+		if (linksToPath !== undefined && linksToPath !== '') {
+			sql += ` AND f.path IN (SELECT source_path FROM links_with_positions WHERE target_path = ?)`;
+			params.push(linksToPath);
+		}
+		if (headingQuery !== undefined && headingQuery !== '') {
+			sql += ` AND f.path IN (SELECT file_path FROM headings_with_positions WHERE heading LIKE ?)`;
+			params.push(`%${headingQuery}%`);
 		}
 		sql += ` ORDER BY f.mtime DESC LIMIT ?`;
 		params.push(limit);
