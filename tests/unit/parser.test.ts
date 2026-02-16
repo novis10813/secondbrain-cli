@@ -110,7 +110,7 @@ Text with #foo and #bar/baz.`;
       expect(bar!.line).toBe(3);
     });
 
-    it('headings include level, text, and position', () => {
+    it('headings include level, text, and position (line and column)', () => {
       const content = `# One
 
 ## Two
@@ -123,6 +123,60 @@ Text with #foo and #bar/baz.`;
       expect(parsed.headings[0]).toEqual({ level: 1, text: 'One', line: 1, column: 1 });
       expect(parsed.headings[1]).toEqual({ level: 2, text: 'Two', line: 3, column: 1 });
       expect(parsed.headings[2]).toEqual({ level: 3, text: 'Three', line: 5, column: 1 });
+    });
+
+    it('headings with frontmatter use body-relative line numbers', () => {
+      const content = `---
+tags: [a]
+---
+
+# Title
+
+## Section`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.headings).toHaveLength(2);
+      expect(parsed.headings[0]).toMatchObject({ level: 1, text: 'Title', line: 1, column: 1 });
+      expect(parsed.headings[1]).toMatchObject({ level: 2, text: 'Section', line: 3, column: 1 });
+    });
+
+    it('does not extract headings inside code blocks', () => {
+      const content = `# Real
+
+\`\`\`
+# Fake in fenced block
+## Also fake
+\`\`\`
+
+## Real Two
+
+Inline \`# not heading\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.headings).toHaveLength(2);
+      expect(parsed.headings[0]).toMatchObject({ level: 1, text: 'Real' });
+      expect(parsed.headings[1]).toMatchObject({ level: 2, text: 'Real Two' });
+    });
+
+    it('extracts all heading levels H1 through H6 with correct level and position', () => {
+      const content = `# H1
+## H2
+### H3
+#### H4
+##### H5
+###### H6`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.headings).toHaveLength(6);
+      for (let i = 0; i < 6; i++) {
+        expect(parsed.headings[i].level).toBe(i + 1);
+        expect(parsed.headings[i].text).toBe(`H${i + 1}`);
+        expect(parsed.headings[i].line).toBe(i + 1);
+        expect(parsed.headings[i].column).toBe(1);
+      }
     });
 
     it('extracts block references ^block-id from body', () => {

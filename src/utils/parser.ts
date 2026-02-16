@@ -237,9 +237,11 @@ export class NoteParser {
 
   private static extractHeadings(body: string): HeadingRef[] {
     const result: HeadingRef[] = [];
+    const codeRanges = this.getCodeBlockRanges(body);
     const headingRegex = /^(#{1,6})\s+(.+)$/gm;
     let match;
     while ((match = headingRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
       const level = match[1].length;
       const text = match[2].trim();
       const pos = this.indexToPosition(body, match.index);
