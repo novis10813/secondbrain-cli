@@ -192,6 +192,50 @@ tags: [a, b]
       expect(link).toBeDefined();
       expect(link!.line).toBe(3); // body line (first line of body is # T)
     });
+
+    it('extracts embeds ![[path]] and ![[path|display]] with positions', () => {
+      const content = `# Doc
+
+Embed ![[image.png]] and ![[note|label]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.embeds).toHaveLength(2);
+      expect(parsed.embeds.map(e => e.target)).toEqual(['image.png', 'note']);
+      expect(parsed.embeds[0].line).toBe(3);
+      expect(parsed.embeds[0].column).toBeGreaterThan(0);
+      expect(parsed.embeds[1].line).toBe(3);
+    });
+
+    it('embeds are not included in links', () => {
+      const content = `# Doc
+
+Link [[page]] and embed ![[other]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.links).toHaveLength(1);
+      expect(parsed.links[0].target).toBe('page');
+      expect(parsed.embeds).toHaveLength(1);
+      expect(parsed.embeds[0].target).toBe('other');
+    });
+
+    it('links and embeds both have correct positions', () => {
+      const content = `# Doc
+
+First [[a]] then ![[b]] then [[c]].`;
+
+      const parsed = NoteParser.parse(content);
+
+      const linkA = parsed.links.find(l => l.target === 'a');
+      const linkC = parsed.links.find(l => l.target === 'c');
+      const embedB = parsed.embeds.find(e => e.target === 'b');
+      expect(linkA).toBeDefined();
+      expect(linkC).toBeDefined();
+      expect(embedB).toBeDefined();
+      expect(parsed.links).toHaveLength(2);
+      expect(parsed.embeds).toHaveLength(1);
+    });
   });
 
   describe('computeHash', () => {

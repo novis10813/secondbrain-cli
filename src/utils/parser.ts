@@ -31,6 +31,12 @@ export interface BlockRef {
   column: number;
 }
 
+export interface EmbedRef {
+  target: string;
+  line: number;
+  column: number;
+}
+
 export interface ParsedNote {
   title: string;
   content: string;
@@ -39,6 +45,7 @@ export interface ParsedNote {
   links: LinkRef[];
   headings: HeadingRef[];
   blockRefs: BlockRef[];
+  embeds: EmbedRef[];
 }
 
 export class NoteParser {
@@ -49,6 +56,7 @@ export class NoteParser {
     const links = this.extractLinks(frontmatter, body);
     const headings = this.extractHeadings(body);
     const blockRefs = this.extractBlockRefs(body);
+    const embeds = this.extractEmbeds(body);
 
     return {
       title,
@@ -57,7 +65,8 @@ export class NoteParser {
       tags,
       links,
       headings,
-      blockRefs
+      blockRefs,
+      embeds
     };
   }
 
@@ -182,7 +191,8 @@ export class NoteParser {
       }
     });
 
-    const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+    // Obsidian links [[x]] or [[x|label]]; exclude embeds ![[x]]
+    const linkRegex = /(?<!!)\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match;
     while ((match = linkRegex.exec(body)) !== null) {
       const target = match[1].trim();
@@ -192,6 +202,22 @@ export class NoteParser {
       result.push({ target, line: pos.line, column: pos.column });
     }
 
+    return result;
+  }
+
+  private static extractEmbeds(body: string): EmbedRef[] {
+    const result: EmbedRef[] = [];
+    const seen = new Set<string>();
+    // Obsidian embeds: ![[path]] or ![[path|display]]
+    const embedRegex = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+    let match;
+    while ((match = embedRegex.exec(body)) !== null) {
+      const target = match[1].trim();
+      if (seen.has(target)) continue;
+      seen.add(target);
+      const pos = this.indexToPosition(body, match.index);
+      result.push({ target, line: pos.line, column: pos.column });
+    }
     return result;
   }
 

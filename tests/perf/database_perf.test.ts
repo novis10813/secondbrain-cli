@@ -31,6 +31,7 @@ describe('Database Performance', () => {
         tags: [],
         links: i > 0 ? [`note-${i-1}`] : [], // Each note links to previous
         blockRefs: [],
+        embeds: [],
         backlinks: [],
         hash: `hash-${i}`,
         createdAt: new Date().toISOString(),

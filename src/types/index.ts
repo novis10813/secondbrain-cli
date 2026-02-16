@@ -7,6 +7,13 @@ export interface VaultFile {
   modifiedAt: string;
 }
 
+/** Embed with position (Obsidian ![[path]]). */
+export interface EmbedRef {
+  target: string;
+  line: number;
+  column: number;
+}
+
 /** Content-derived metadata: parsed from file content. Source: parser + hash. */
 export interface NoteContent {
   title: string;
@@ -15,6 +22,7 @@ export interface NoteContent {
   tags: string[];
   links: string[];
   blockRefs: string[];
+  embeds: EmbedRef[];
   hash: string;
 }
 
