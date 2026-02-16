@@ -14,6 +14,7 @@ export function createCaptureCommand(): Command {
     .option('--path <path>', 'Custom file path')
     .action(async (content, options) => {
       try {
+        const body = content ?? '';
         const vaultPath = ConfigManager.findVaultPath();
         if (!vaultPath) {
           console.error('❌ Not in a SecondBrain vault. Run `sb init` first.');
@@ -60,16 +61,16 @@ export function createCaptureCommand(): Command {
 
         // Generate content
         frontmatter.tags = [...new Set(tags)]; // Remove duplicates
-        noteContent = NoteParser.generateNoteContent(title, content, frontmatter);
+        noteContent = NoteParser.generateNoteContent(title, body, frontmatter);
 
         // Write note
         vault.writeNote(notePath, noteContent);
 
         // Sync single note to database (optimized - no full vault scan)
-        const content = vault.readNote(notePath);
-        if (content) {
-          const hash = NoteParser.computeHash(content);
-          const note = await vault.createNoteFromFile(notePath, content, hash);
+        const noteFileContent = vault.readNote(notePath);
+        if (noteFileContent) {
+          const hash = NoteParser.computeHash(noteFileContent);
+          const note = await vault.createNoteFromFile(notePath, noteFileContent, hash);
           vault.upsertNote(note);
         }
 
