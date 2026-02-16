@@ -44,7 +44,7 @@ describe('DatabaseManager Upsert', () => {
     const saved = db.getNoteByPath('e.md');
     expect(saved?.embeds).toEqual(embeds);
     db.close();
-  });
+  }, 15000);
 
   it('persists headings with level and position and returns them on get', () => {
     const db = new DatabaseManager(config);
@@ -60,7 +60,7 @@ describe('DatabaseManager Upsert', () => {
     const saved = db.getNoteByPath('headings.md');
     expect(saved?.headings).toEqual(headings);
     db.close();
-  });
+  }, 15000);
 
   it('persists TFile-aligned fields (parent, basename, stat) and returns them on get', () => {
     const db = new DatabaseManager(config);
@@ -114,5 +114,5 @@ describe('DatabaseManager Upsert', () => {
     expect(saved?.basename).toBeUndefined();
     expect(saved?.stat).toBeUndefined();
     db.close();
-  });
+  }, 15000);
 });

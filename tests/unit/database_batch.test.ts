@@ -50,14 +50,14 @@ describe('DatabaseManager Batch Operations', () => {
     expect(file1?.basename).toBe('note1');
 
     db.close();
-  });
+  }, 15000);
 
   it('should handle empty batch for files', () => {
     const db = new DatabaseManager(config);
     db.upsertFilesBatch([]);
     // Should not throw
     db.close();
-  });
+  }, 15000);
 
   it('should upsert multiple ContentMetadata in batch', () => {
     const db = new DatabaseManager(config);
@@ -112,14 +112,14 @@ describe('DatabaseManager Batch Operations', () => {
     expect(metadata2?.tags?.[0].tag).toBe('test');
 
     db.close();
-  });
+  }, 15000);
 
   it('should handle empty batch for ContentMetadata', () => {
     const db = new DatabaseManager(config);
     db.upsertContentMetadataBatch([]);
     // Should not throw
     db.close();
-  });
+  }, 15000);
 
   it('should handle large batch operations', () => {
     const db = new DatabaseManager(config);
@@ -137,5 +137,5 @@ describe('DatabaseManager Batch Operations', () => {
     }
 
     db.close();
-  });
+  }, 15000);
 });

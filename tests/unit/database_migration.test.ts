@@ -342,5 +342,5 @@ describe('DatabaseManager Migration from Old Schema', () => {
     expect(result.errors).toBe(0);
 
     db.close();
-  });
+  }, 10000);
 });

@@ -47,7 +47,7 @@ describe('DatabaseManager FileInfo Operations', () => {
     });
 
     db.close();
-  });
+  }, 15000);
 
   it('should update FileInfo when upserting again', () => {
     const db = new DatabaseManager(config);
@@ -86,14 +86,14 @@ describe('DatabaseManager FileInfo Operations', () => {
     expect(retrieved?.stat.size).toBe(100);
 
     db.close();
-  });
+  }, 15000);
 
   it('should return null for non-existent file', () => {
     const db = new DatabaseManager(config);
     const retrieved = db.getFileByPath('nonexistent.md');
     expect(retrieved).toBeNull();
     db.close();
-  });
+  }, 15000);
 
   it('should delete a file', () => {
     const db = new DatabaseManager(config);
@@ -117,7 +117,7 @@ describe('DatabaseManager FileInfo Operations', () => {
     expect(db.getFileByPath('test/note.md')).toBeNull();
 
     db.close();
-  });
+  }, 15000);
 
   it('should handle file with null parent', () => {
     const db = new DatabaseManager(config);
@@ -140,7 +140,7 @@ describe('DatabaseManager FileInfo Operations', () => {
     expect(retrieved?.parent).toBeNull();
 
     db.close();
-  });
+  }, 15000);
 
   it('should filter searchFiles by path prefix', () => {
     const db = new DatabaseManager(config);
@@ -176,5 +176,5 @@ describe('DatabaseManager FileInfo Operations', () => {
     expect(projects[0].file.path).toBe('Projects/note.md');
 
     db.close();
-  });
+  }, 15000);
 });

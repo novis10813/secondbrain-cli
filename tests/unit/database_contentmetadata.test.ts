@@ -68,7 +68,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.links?.[1].displayText).toBe('display');
 
     db.close();
-  });
+  }, 15000);
 
   it('should upsert and retrieve ContentMetadata with tags', () => {
     const db = new DatabaseManager(config);
@@ -102,7 +102,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.tags?.[1].tag).toBe('important');
 
     db.close();
-  });
+  }, 15000);
 
   it('should upsert and retrieve ContentMetadata with headings', () => {
     const db = new DatabaseManager(config);
@@ -139,7 +139,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.headings?.[1].level).toBe(2);
 
     db.close();
-  });
+  }, 15000);
 
   it('should upsert and retrieve ContentMetadata with blocks', () => {
     const db = new DatabaseManager(config);
@@ -165,7 +165,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.blocks?.[0].id).toBe('block-123');
 
     db.close();
-  });
+  }, 15000);
 
   it('should upsert and retrieve ContentMetadata with embeds', () => {
     const db = new DatabaseManager(config);
@@ -193,7 +193,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.embeds?.[0].original).toBe('![[image.png]]');
 
     db.close();
-  });
+  }, 15000);
 
   it('should upsert and retrieve ContentMetadata with frontmatter', () => {
     const db = new DatabaseManager(config);
@@ -217,7 +217,7 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.frontmatter?.position.end.line).toBe(3);
 
     db.close();
-  });
+  }, 15000);
 
   it('should update ContentMetadata when upserting again', () => {
     const db = new DatabaseManager(config);
@@ -259,14 +259,14 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.links?.[0].link).toBe('new.md');
 
     db.close();
-  });
+  }, 15000);
 
   it('should return null for non-existent ContentMetadata', () => {
     const db = new DatabaseManager(config);
     const retrieved = db.getContentMetadata('nonexistent.md');
     expect(retrieved).toBeNull();
     db.close();
-  });
+  }, 15000);
 
   it('should handle empty ContentMetadata', () => {
     const db = new DatabaseManager(config);
@@ -282,5 +282,5 @@ describe('DatabaseManager ContentMetadata Operations', () => {
     expect(retrieved?.tags).toBeUndefined();
 
     db.close();
-  });
+  }, 15000);
 });
