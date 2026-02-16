@@ -261,4 +261,54 @@ describe('VaultManager', () => {
       expect(path).toBe('Templates/meeting.md');
     });
   });
+
+  describe('new structure: FileInfo and ContentMetadata', () => {
+    it('應該使用新的 FileInfo 和 ContentMetadata 結構', async () => {
+      const content = '# Test Note\n\nContent with [[link]] and #tag';
+      vaultManager.writeNote('new-structure.md', content);
+      await vaultManager.sync();
+
+      // Check FileInfo via database
+      const fileInfo = vaultManager['db'].getFileByPath('new-structure.md');
+      expect(fileInfo).not.toBeNull();
+      expect(fileInfo?.path).toBe('new-structure.md');
+      expect(fileInfo?.name).toBe('new-structure.md');
+      expect(fileInfo?.basename).toBe('new-structure');
+      expect(fileInfo?.extension).toBe('md');
+      expect(fileInfo?.stat).toBeDefined();
+      expect(fileInfo?.stat.ctime).toBeGreaterThan(0);
+      expect(fileInfo?.stat.mtime).toBeGreaterThan(0);
+      expect(fileInfo?.stat.size).toBeGreaterThan(0);
+
+      // Check ContentMetadata via database
+      const contentMetadata = vaultManager['db'].getContentMetadata('new-structure.md');
+      expect(contentMetadata).not.toBeNull();
+      expect(contentMetadata?.links).toBeDefined();
+      expect(contentMetadata?.links?.length).toBeGreaterThan(0);
+      expect(contentMetadata?.tags).toBeDefined();
+      expect(contentMetadata?.tags?.length).toBeGreaterThan(0);
+      expect(contentMetadata?.headings).toBeDefined();
+      expect(contentMetadata?.headings?.length).toBeGreaterThan(0);
+
+      // Verify positions are stored
+      if (contentMetadata?.links && contentMetadata.links.length > 0) {
+        const link = contentMetadata.links[0];
+        expect(link.position).toBeDefined();
+        expect(link.position.start).toBeDefined();
+        expect(link.position.start.line).toBeGreaterThanOrEqual(0);
+        expect(link.position.start.offset).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it('應該正確處理 frontmatter 位置', async () => {
+      const content = '---\ntags: [test]\n---\n\n# Note';
+      vaultManager.writeNote('frontmatter.md', content);
+      await vaultManager.sync();
+
+      const contentMetadata = vaultManager['db'].getContentMetadata('frontmatter.md');
+      expect(contentMetadata?.frontmatter).toBeDefined();
+      expect(contentMetadata?.frontmatter?.position).toBeDefined();
+      expect(contentMetadata?.frontmatter?.position.start.line).toBeGreaterThanOrEqual(0);
+    });
+  });
 });

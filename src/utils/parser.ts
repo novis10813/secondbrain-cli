@@ -1,7 +1,17 @@
 import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
-import type { Pos, HeadingCache, ListItemCache } from '../types/index.js';
+import type {
+	Pos,
+	HeadingCache,
+	ListItemCache,
+	ContentMetadata,
+	LinkCache,
+	TagCache,
+	EmbedCache,
+	BlockCache,
+	FrontMatterCache
+} from '../types/index.js';
 import { rangeToPos } from './position.js';
 
 export interface Position {
@@ -519,14 +529,117 @@ export class NoteParser {
     }));
   }
 
-  /**
-   * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
-   * Preserves task status and position information.
-   */
-  static listItemsToCache(listItems: ListItemRef[]): ListItemCache[] {
-    return listItems.map(li => ({
-      task: li.task,
-      position: li.position
-    }));
-  }
+	/**
+	 * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
+	 * Preserves task status and position information.
+	 */
+	static listItemsToCache(listItems: ListItemRef[]): ListItemCache[] {
+		return listItems.map(li => ({
+			task: li.task,
+			position: li.position
+		}));
+	}
+
+	/**
+	 * Convert ParsedNote to ContentMetadata (Obsidian CachedMetadata format).
+	 * Separates content-derived metadata from file system information.
+	 */
+	static parsedToContentMetadata(parsed: ParsedNote, originalContent?: string): ContentMetadata {
+		const metadata: ContentMetadata = {};
+
+		// Convert links
+		if (parsed.links.length > 0) {
+			metadata.links = parsed.links.map((link): LinkCache => {
+				// Try to extract display text from original content if available
+				let displayText: string | undefined;
+				let original = `[[${link.target}]]`;
+				if (originalContent) {
+					const startOffset = link.position.start.offset;
+					const endOffset = link.position.end.offset;
+					const linkText = originalContent.slice(startOffset, endOffset);
+					const match = linkText.match(/\[\[([^\]]+)\]\]/);
+					if (match) {
+						original = match[0];
+						const parts = match[1].split('|');
+						if (parts.length > 1) {
+							displayText = parts.slice(1).join('|');
+						}
+					}
+				}
+				return {
+					link: link.target,
+					original,
+					displayText,
+					position: link.position
+				};
+			});
+		}
+
+		// Convert embeds
+		if (parsed.embeds.length > 0) {
+			metadata.embeds = parsed.embeds.map((embed): EmbedCache => {
+				// Try to extract display text from original content if available
+				let displayText: string | undefined;
+				let original = `![[${embed.target}]]`;
+				if (originalContent) {
+					const startOffset = embed.position.start.offset;
+					const endOffset = embed.position.end.offset;
+					const embedText = originalContent.slice(startOffset, endOffset);
+					const match = embedText.match(/!\[\[([^\]]+)\]\]/);
+					if (match) {
+						original = match[0];
+						const parts = match[1].split('|');
+						if (parts.length > 1) {
+							displayText = parts.slice(1).join('|');
+						}
+					}
+				}
+				return {
+					link: embed.target,
+					original,
+					displayText,
+					position: embed.position
+				};
+			});
+		}
+
+		// Convert tags
+		if (parsed.tags.length > 0) {
+			metadata.tags = parsed.tags.map(
+				(tag): TagCache => ({
+					tag: tag.name,
+					position: tag.position
+				})
+			);
+		}
+
+		// Convert headings
+		if (parsed.headings.length > 0) {
+			metadata.headings = this.headingsToCache(parsed.headings);
+		}
+
+		// Convert blocks
+		if (parsed.blockRefs.length > 0) {
+			metadata.blocks = parsed.blockRefs.map(
+				(block): BlockCache => ({
+					id: block.blockId,
+					position: block.position
+				})
+			);
+		}
+
+		// Convert frontmatter position
+		if (parsed.frontmatterPosition) {
+			metadata.frontmatter = {
+				position: parsed.frontmatterPosition
+			};
+		}
+
+		// Convert list items
+		if (parsed.listItems.length > 0) {
+			metadata.listItems = this.listItemsToCache(parsed.listItems);
+		}
+
+		return metadata;
+	}
 }

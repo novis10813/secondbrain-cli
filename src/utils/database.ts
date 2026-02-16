@@ -274,9 +274,43 @@ export class DatabaseManager {
     };
   }
 
-  deleteFile(path: string): void {
-    this.db.prepare('DELETE FROM files WHERE path = ?').run(path);
-  }
+	deleteFile(path: string): void {
+		this.db.prepare('DELETE FROM files WHERE path = ?').run(path);
+	}
+
+	getAllFiles(): FileInfo[] {
+		const rows = this.db.prepare('SELECT * FROM files').all() as any[];
+		return rows.map(row => ({
+			path: row.path,
+			name: row.name,
+			basename: row.basename,
+			extension: row.extension,
+			parent: row.parent,
+			stat: {
+				ctime: row.ctime,
+				mtime: row.mtime,
+				size: row.size
+			}
+		}));
+	}
+
+	getFileContentHash(filePath: string): string | null {
+		const row = this.db.prepare('SELECT content_hash FROM files WHERE path = ?').get(filePath) as any;
+		return row?.content_hash ?? null;
+	}
+
+	/**
+	 * Update link target in links_with_positions table.
+	 * Finds link by source_path and start_offset, then updates target_path and target_id.
+	 */
+	updateLinkTarget(sourcePath: string, startOffset: number, targetPath: string | null, targetId: string | null): void {
+		const stmt = this.db.prepare(`
+			UPDATE links_with_positions
+			SET target_path = ?, target_id = ?
+			WHERE source_path = ? AND start_offset = ?
+		`);
+		stmt.run(targetPath, targetId, sourcePath, startOffset);
+	}
 
   // ContentMetadata operations
   upsertContentMetadata(filePath: string, metadata: ContentMetadata, contentHash: string): void {
