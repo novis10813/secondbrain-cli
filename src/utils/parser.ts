@@ -25,6 +25,12 @@ export interface HeadingRef {
   column: number;
 }
 
+export interface BlockRef {
+  blockId: string;
+  line: number;
+  column: number;
+}
+
 export interface ParsedNote {
   title: string;
   content: string;
@@ -32,6 +38,7 @@ export interface ParsedNote {
   tags: TagRef[];
   links: LinkRef[];
   headings: HeadingRef[];
+  blockRefs: BlockRef[];
 }
 
 export class NoteParser {
@@ -41,6 +48,7 @@ export class NoteParser {
     const tags = this.extractTags(frontmatter, body);
     const links = this.extractLinks(frontmatter, body);
     const headings = this.extractHeadings(body);
+    const blockRefs = this.extractBlockRefs(body);
 
     return {
       title,
@@ -48,7 +56,8 @@ export class NoteParser {
       frontmatter,
       tags,
       links,
-      headings
+      headings,
+      blockRefs
     };
   }
 
@@ -209,6 +218,24 @@ export class NoteParser {
       const text = match[2].trim();
       const pos = this.indexToPosition(body, match.index);
       result.push({ level, text, line: pos.line, column: pos.column });
+    }
+    return result;
+  }
+
+  private static extractBlockRefs(body: string): BlockRef[] {
+    const result: BlockRef[] = [];
+    const seen = new Set<string>();
+    const codeRanges = this.getCodeBlockRanges(body);
+    // Obsidian block ref: ^block-id (alphanumeric, hyphens, underscores)
+    const blockRefRegex = /\^([a-zA-Z0-9_-]+)/g;
+    let match;
+    while ((match = blockRefRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
+      const blockId = match[1];
+      if (seen.has(blockId)) continue;
+      seen.add(blockId);
+      const pos = this.indexToPosition(body, match.index);
+      result.push({ blockId, line: pos.line, column: pos.column });
     }
     return result;
   }

@@ -13,11 +13,11 @@ describe('DatabaseManager Upsert', () => {
 
   it('should update a note when content changes but path remains the same', () => {
     const db = new DatabaseManager(config);
-    const note1 = { id: 'hash1', path: 'test.md', title: 'T1', content: 'C1', frontmatter: {}, tags: [], links: [], hash: 'hash1', createdAt: '', modifiedAt: '' };
+    const note1 = { id: 'hash1', path: 'test.md', title: 'T1', content: 'C1', frontmatter: {}, tags: [], links: [], blockRefs: [], hash: 'hash1', createdAt: '', modifiedAt: '' };
     db.upsertNote(note1 as any);
     
     // Content changes -> hash changes -> ID changes
-    const note2 = { id: 'hash2', path: 'test.md', title: 'T1', content: 'C2', frontmatter: {}, tags: [], links: [], hash: 'hash2', createdAt: '', modifiedAt: '' };
+    const note2 = { id: 'hash2', path: 'test.md', title: 'T1', content: 'C2', frontmatter: {}, tags: [], links: [], blockRefs: [], hash: 'hash2', createdAt: '', modifiedAt: '' };
     
     // This should NOT throw "UNIQUE constraint failed: notes.path"
     db.upsertNote(note2 as any);

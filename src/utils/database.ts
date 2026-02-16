@@ -22,11 +22,19 @@ export class DatabaseManager {
         content TEXT NOT NULL,
         frontmatter TEXT NOT NULL,
         tags TEXT NOT NULL,
+        block_refs TEXT NOT NULL DEFAULT '[]',
         hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
         modified_at TEXT NOT NULL
       )
     `);
+
+    // Migration: add block_refs to existing tables
+    try {
+      this.db.exec(`ALTER TABLE notes ADD COLUMN block_refs TEXT NOT NULL DEFAULT '[]'`);
+    } catch {
+      // Column already exists
+    }
 
     // Links table (many-to-many)
     this.db.exec(`
@@ -55,14 +63,15 @@ export class DatabaseManager {
   // Note operations
   upsertNote(note: Note): void {
     const stmt = this.db.prepare(`
-      INSERT INTO notes (id, path, title, content, frontmatter, tags, hash, created_at, modified_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO notes (id, path, title, content, frontmatter, tags, block_refs, hash, created_at, modified_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(path) DO UPDATE SET
         id = excluded.id,
         title = excluded.title,
         content = excluded.content,
         frontmatter = excluded.frontmatter,
         tags = excluded.tags,
+        block_refs = excluded.block_refs,
         hash = excluded.hash,
         modified_at = excluded.modified_at
     `);
@@ -74,6 +83,7 @@ export class DatabaseManager {
       note.content,
       JSON.stringify(note.frontmatter),
       JSON.stringify(note.tags),
+      JSON.stringify(note.blockRefs),
       note.hash,
       note.createdAt,
       note.modifiedAt
@@ -233,6 +243,7 @@ export class DatabaseManager {
       tags: JSON.parse(row.tags),
       links: links.map((l: any) => l.target_id),
       backlinks: backlinks.map((l: any) => l.source_id),
+      blockRefs: JSON.parse(row.block_refs ?? '[]'),
       hash: row.hash,
       createdAt: row.created_at,
       modifiedAt: row.modified_at
@@ -310,6 +321,7 @@ export class DatabaseManager {
         tags: JSON.parse(row.tags),
         links,
         backlinks,
+        blockRefs: JSON.parse(row.block_refs ?? '[]'),
         hash: row.hash,
         createdAt: row.created_at,
         modifiedAt: row.modified_at,

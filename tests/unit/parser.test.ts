@@ -125,6 +125,57 @@ Text with #foo and #bar/baz.`;
       expect(parsed.headings[2]).toEqual({ level: 3, text: 'Three', line: 5, column: 1 });
     });
 
+    it('extracts block references ^block-id from body', () => {
+      const content = `# Doc
+
+Paragraph with ^abc123 at end.
+
+Another ^xyz-99 and ^ref_id.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.blockRefs).toHaveLength(3);
+      expect(parsed.blockRefs.map(b => b.blockId)).toEqual(['abc123', 'xyz-99', 'ref_id']);
+    });
+
+    it('block refs include position (line, column)', () => {
+      const content = `# Doc
+
+Text ^block1 more ^block2.`;
+
+      const parsed = NoteParser.parse(content);
+
+      const b1 = parsed.blockRefs.find(b => b.blockId === 'block1');
+      const b2 = parsed.blockRefs.find(b => b.blockId === 'block2');
+      expect(b1).toBeDefined();
+      expect(b1!.line).toBe(3);
+      expect(b2).toBeDefined();
+      expect(b2!.line).toBe(3);
+    });
+
+    it('deduplicates block refs by blockId', () => {
+      const content = 'Same ^id and again ^id.';
+      const parsed = NoteParser.parse(content);
+      expect(parsed.blockRefs).toHaveLength(1);
+      expect(parsed.blockRefs[0].blockId).toBe('id');
+    });
+
+    it('does not extract block refs inside code blocks', () => {
+      const content = `# Doc
+
+Normal ^real.
+
+\`\`\`
+code with ^fake-id
+\`\`\`
+
+Inline \`^also-fake\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+      expect(parsed.blockRefs).toHaveLength(1);
+      expect(parsed.blockRefs[0].blockId).toBe('real');
+    });
+
     it('frontmatter tags have position line 1, body link has body-relative line', () => {
       const content = `---
 tags: [a, b]

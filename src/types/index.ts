@@ -1,15 +1,27 @@
-export interface Note {
-  id: string;                    // content hash (sha256)
-  path: string;                  // relative path in vault
+/** File system info (TFile equivalent): path, name, stat. Source: filesystem only. */
+export interface VaultFile {
+  path: string;
+  name: string;
+  extension: string;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+/** Content-derived metadata: parsed from file content. Source: parser + hash. */
+export interface NoteContent {
   title: string;
   content: string;
   frontmatter: Record<string, unknown>;
   tags: string[];
-  links: string[];               // note IDs this note links to
-  backlinks: string[];           // note IDs that link to this note
-  hash: string;                  // content hash
-  createdAt: string;
-  modifiedAt: string;
+  links: string[];
+  blockRefs: string[];
+  hash: string;
+}
+
+/** Note = VaultFile + NoteContent + id (content hash) + backlinks (computed by DB). */
+export interface Note extends VaultFile, NoteContent {
+  id: string;
+  backlinks: string[];
 }
 
 export interface SearchResult {

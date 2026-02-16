@@ -126,6 +126,15 @@ describe('VaultManager', () => {
       const sourceNote = vaultManager.getNoteByPath('source.md');
       expect(sourceNote?.links.length).toBeGreaterThan(0);
     });
+
+    it('應該解析並追蹤 block references', async () => {
+      vaultManager.writeNote('blocks.md', '# Blocks\n\nParagraph ^abc123.\n\nList ^xyz-99');
+      await vaultManager.sync();
+
+      const note = vaultManager.getNoteByPath('blocks.md');
+      expect(note?.blockRefs).toContain('abc123');
+      expect(note?.blockRefs).toContain('xyz-99');
+    });
   });
 
   describe('searchNotes', () => {

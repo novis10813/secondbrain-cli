@@ -126,6 +126,7 @@ export class VaultManager {
       frontmatter: parsed.frontmatter,
       tags: parsed.tags.map(t => t.name),
       links: links,
+      blockRefs: parsed.blockRefs.map(b => b.blockId),
       backlinks: [], // Will be computed by database
       hash,
       createdAt: stats.birthtime.toISOString(),
