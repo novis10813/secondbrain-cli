@@ -5,7 +5,7 @@ import { VaultManager } from '../utils/vault.js';
 export function createBacklinksCommand(): Command {
   const command = new Command('backlinks')
     .description('Get backlinks for a note')
-    .argument('<path-or-id>', 'File path or note ID')
+    .argument('<path-or-id>', 'File path or basename')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action((pathOrId, options) => {
       try {
@@ -19,12 +19,8 @@ export function createBacklinksCommand(): Command {
         const config = configManager.getConfig();
         const vault = new VaultManager(config);
 
-        // Resolve to file path
-        const asPath = pathOrId.includes('/') || pathOrId.endsWith('.md')
-          ? pathOrId
-          : pathOrId + '.md';
-        const file = vault.getFileByPath(pathOrId) ?? vault.getFileByPath(asPath);
-        const resolvedPath = file?.path ?? vault.getNoteById(pathOrId)?.path;
+        const file = vault.resolvePathOrBasename(pathOrId);
+        const resolvedPath = file?.path ?? null;
         if (!resolvedPath) {
           console.error('❌ Note not found');
           process.exit(1);

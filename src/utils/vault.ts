@@ -343,6 +343,22 @@ export class VaultManager {
   }
 
   /**
+   * Resolve path or basename to FileInfo using new structure only.
+   * Tries exact path, path + .md, then match by basename.
+   */
+  resolvePathOrBasename(pathOrBasename: string): FileInfo | null {
+    let file = this.db.getFileByPath(pathOrBasename);
+    if (file) return file;
+    if (!pathOrBasename.endsWith('.md')) {
+      file = this.db.getFileByPath(pathOrBasename + '.md');
+      if (file) return file;
+    }
+    const base = pathOrBasename.replace(/\.md$/i, '').toLowerCase();
+    const all = this.db.getAllFiles();
+    return all.find(f => f.basename.toLowerCase() === base) ?? null;
+  }
+
+  /**
    * Get ContentMetadata for a FileInfo (Obsidian-style API).
    * Equivalent to Obsidian's MetadataCache.getFileCache(file).
    * @param file FileInfo object

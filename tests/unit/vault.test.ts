@@ -414,6 +414,39 @@ describe('VaultManager', () => {
       });
     });
 
+    describe('resolvePathOrBasename', () => {
+      it('should resolve by exact path', () => {
+        const file = vaultManager.resolvePathOrBasename('simple.md');
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('simple.md');
+        expect(file?.basename).toBe('simple');
+      });
+
+      it('should resolve by path without extension', () => {
+        const file = vaultManager.resolvePathOrBasename('simple');
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('simple.md');
+      });
+
+      it('should resolve by basename only', () => {
+        const file = vaultManager.resolvePathOrBasename('nested');
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('folder/nested.md');
+        expect(file?.basename).toBe('nested');
+      });
+
+      it('should resolve nested path', () => {
+        const file = vaultManager.resolvePathOrBasename('folder/nested.md');
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('folder/nested.md');
+      });
+
+      it('should return null for non-existent path or basename', () => {
+        expect(vaultManager.resolvePathOrBasename('nonexistent')).toBeNull();
+        expect(vaultManager.resolvePathOrBasename('nonexistent.md')).toBeNull();
+      });
+    });
+
     describe('getFileCache', () => {
       it('should return ContentMetadata for FileInfo', () => {
         const file = vaultManager.getFileByPath('simple.md');

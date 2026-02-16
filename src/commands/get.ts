@@ -6,7 +6,7 @@ import { NoteParser } from '../utils/parser.js';
 export function createGetCommand(): Command {
   const command = new Command('get')
     .description('Get a note by path or ID')
-    .argument('<path-or-id>', 'File path (e.g. note.md or folder/note.md) or note ID')
+    .argument('<path-or-id>', 'File path (e.g. note.md or folder/note.md) or basename')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action((pathOrId, options) => {
       try {
@@ -20,19 +20,8 @@ export function createGetCommand(): Command {
         const config = configManager.getConfig();
         const vault = new VaultManager(config);
 
-        // Resolve path: try as path first, then as note ID
-        let resolvedPath: string | null = null;
-        const asPath = pathOrId.includes('/') || pathOrId.endsWith('.md')
-          ? pathOrId
-          : pathOrId + '.md';
-        const file = vault.getFileByPath(pathOrId) ?? vault.getFileByPath(asPath);
-        if (file) {
-          resolvedPath = file.path;
-        } else {
-          const note = vault.getNoteById(pathOrId);
-          if (note) resolvedPath = note.path;
-        }
-
+        const file = vault.resolvePathOrBasename(pathOrId);
+        const resolvedPath = file?.path ?? null;
         if (!resolvedPath) {
           console.error('❌ Note not found');
           process.exit(1);
@@ -45,8 +34,7 @@ export function createGetCommand(): Command {
         }
 
         const parsed = NoteParser.parse(content);
-        const fileInfo = vault.getFileByPath(resolvedPath);
-        const cache = fileInfo ? vault.getFileCache(fileInfo) : null;
+        const cache = file ? vault.getFileCache(file) : null;
 
         if (options.format === 'json') {
           console.log(JSON.stringify({

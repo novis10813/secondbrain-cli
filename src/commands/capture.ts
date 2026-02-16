@@ -74,20 +74,17 @@ export function createCaptureCommand(): Command {
           vault.upsertNote(note);
         }
 
-        const note = vault.getNoteByPath(notePath);
-        
+        const file = vault.getFileByPath(notePath);
+
         console.log('✅ Note captured!');
         console.log('Path:', notePath);
-        if (note) {
-          console.log('ID:', note.id);
-          console.log(JSON.stringify({
-            success: true,
-            id: note.id,
-            path: notePath,
-            title,
-            tags
-          }, null, 2));
-        }
+        console.log(JSON.stringify({
+          success: true,
+          path: notePath,
+          basename: file?.basename ?? notePath.replace(/\.md$/, ''),
+          title,
+          tags
+        }, null, 2));
 
         vault.close();
       } catch (error) {
