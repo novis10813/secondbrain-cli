@@ -1,20 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
-import { DatabaseManager } from '../../src/utils/database.ts';
-import type { Note } from '../../src/types/index.ts';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'fs';
+import { DatabaseManager } from '../../src/utils/database';
+import type { Note } from '../../src/types/index';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 describe('Database Performance', () => {
   let db: DatabaseManager;
   let tempDir: string;
-  let queryCount = 0;
 
   beforeAll(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'secondbrain-perf-'));
     const dbPath = join(tempDir, 'test.db');
     
-    // Wrap db to count queries
+    // TODO: Wrap db to count queries (Task 4)
     db = new DatabaseManager({
       vaultPath: tempDir,
       dbPath,
@@ -43,6 +42,7 @@ describe('Database Performance', () => {
 
   afterAll(() => {
     db.close();
+    rmSync(tempDir, { recursive: true });
   });
 
   it('should not perform N+1 queries when loading all notes', () => {
