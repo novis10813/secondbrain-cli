@@ -50,53 +50,75 @@ interface CachedMetadata {
 
 ## SecondBrain CLI 的 Metadata
 
-根據 `src/types/index.ts` 和 `src/utils/database.ts`，CLI 儲存在 SQLite 資料庫中的 metadata：
+CLI 使用 **雙層結構**：與 Obsidian 對齊的 `files` + `content_metadata` + 位置表，以及相容舊版的 `notes` + `links`（可透過 `sb migrate` 遷移）。主要查詢與同步以新結構為準。
 
-```typescript
-interface Note {
-  id: string;                    // content hash (sha256)
-  path: string;                  // vault 中的相對路徑
-  title: string;                // 筆記標題
-  content: string;              // 完整內容
-  frontmatter: Record<string, unknown>; // Frontmatter 物件
-  tags: string[];               // 標籤陣列
-  links: string[];               // 連結到的筆記 ID 陣列
-  backlinks: string[];           // 連結到此筆記的筆記 ID 陣列
-  hash: string;                  // 內容雜湊值
-  createdAt: string;             // 建立時間 (ISO 8601)
-  modifiedAt: string;            // 修改時間 (ISO 8601)
-}
+### 新結構：files + content_metadata（TFile / CachedMetadata 對齊）
+
+**files**（對應 TFile / FileStats）：
+
+```sql
+CREATE TABLE files (
+  path TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  basename TEXT NOT NULL,
+  extension TEXT NOT NULL,
+  parent TEXT,
+  ctime INTEGER NOT NULL,
+  mtime INTEGER NOT NULL,
+  size INTEGER NOT NULL,
+  content_hash TEXT NOT NULL
+);
 ```
 
-### 資料庫結構
+**content_metadata**（frontmatter 位置等）：
+
+```sql
+CREATE TABLE content_metadata (
+  file_path TEXT PRIMARY KEY,
+  content_hash TEXT NOT NULL,
+  frontmatter_start_line INTEGER, ...
+);
+```
+
+**位置表**（含行/列/offset，對應 Obsidian CacheItem）：
+
+- `links_with_positions`：連結目標、original、display_text、start/end line/col/offset
+- `tags_with_positions`：tag、位置
+- `headings_with_positions`：heading、level (1–6)、位置
+- `blocks_with_positions`：block_id（區塊引用）
+- `embeds_with_positions`：target_path、original、display_text、位置
+- `sections_with_positions`：section_id、type、位置
+
+### 舊結構（notes + links，遷移後仍可並存）
 
 ```sql
 CREATE TABLE notes (
-  id TEXT PRIMARY KEY,           -- content hash
-  path TEXT UNIQUE NOT NULL,     -- 相對路徑
-  title TEXT NOT NULL,           -- 標題
-  content TEXT NOT NULL,         -- 完整內容
-  frontmatter TEXT NOT NULL,     -- JSON 字串化的 frontmatter
-  tags TEXT NOT NULL,            -- JSON 字串化的標籤陣列
-  hash TEXT NOT NULL,            -- 內容雜湊
-  created_at TEXT NOT NULL,      -- 建立時間
-  modified_at TEXT NOT NULL      -- 修改時間
+  id TEXT PRIMARY KEY,
+  path TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  frontmatter TEXT NOT NULL,
+  tags TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  modified_at TEXT NOT NULL,
+  ...
 );
 
 CREATE TABLE links (
-  source_id TEXT NOT NULL,       -- 來源筆記 ID
-  target_id TEXT NOT NULL,       -- 目標筆記 ID
+  source_id TEXT NOT NULL,
+  target_id TEXT NOT NULL,
   PRIMARY KEY (source_id, target_id)
 );
 ```
 
 ### 特點
 
-- **持久化儲存**: 儲存在 SQLite 資料庫中，可跨會話使用
-- **連結解析**: 將 wikilink 標題解析為筆記 ID，建立雙向連結關係
-- **雜湊追蹤**: 使用 SHA256 追蹤內容變更
-- **時間戳記**: 記錄檔案的建立和修改時間
-- **簡化結構**: 不包含位置資訊，專注於內容和關係
+- **持久化儲存**: SQLite 資料庫，可跨會話使用
+- **Obsidian 對齊**: files/content_metadata + 位置表對齊 TFile / CachedMetadata
+- **位置資訊**: 新結構中連結、標籤、標題、區塊、嵌入、區段皆含行/列/offset
+- **雜湊追蹤**: content_hash 追蹤內容變更
+- **時間戳記**: ctime/mtime（files）、created_at/modified_at（notes）
 
 ## 主要差異對照表
 
@@ -104,16 +126,16 @@ CREATE TABLE links (
 |------|----------|-----------------|
 | **儲存位置** | 記憶體快取 | SQLite 資料庫 |
 | **持久化** | ❌ 不持久化 | ✅ 持久化 |
-| **位置資訊** | ✅ 行號、列號 | ❌ 無 |
-| **標題結構** | ✅ 完整層級結構 | ❌ 僅提取標題文字 |
-| **區塊引用** | ✅ 支援 | ❌ 不支援 |
+| **位置資訊** | ✅ 行號、列號 | ✅ 新結構（*_with_positions）含 line/col/offset |
+| **標題結構** | ✅ 完整層級結構 | ✅ headings_with_positions（level 1–6） |
+| **區塊引用** | ✅ 支援 | ✅ blocks_with_positions 儲存 block_id |
 | **腳註** | ✅ 支援 | ❌ 不支援 |
 | **列表結構** | ✅ 完整結構 | ❌ 不支援 |
-| **嵌入檔案** | ✅ 追蹤 | ❌ 不追蹤 |
-| **連結解析** | 標題/路徑匹配 | ✅ ID 解析（更精確） |
+| **嵌入檔案** | ✅ 追蹤 | ✅ embeds_with_positions |
+| **連結解析** | 標題/路徑匹配 | ✅ 路徑/ID + links_with_positions |
 | **雙向連結** | ✅ 自動計算 | ✅ 自動計算 |
-| **時間戳記** | ❌ 無 | ✅ 建立/修改時間 |
-| **內容雜湊** | ❌ 無 | ✅ SHA256 |
+| **時間戳記** | ❌ 無 | ✅ ctime/mtime（files） |
+| **內容雜湊** | ❌ 無 | ✅ content_hash |
 | **查詢效能** | 記憶體查詢 | ✅ SQL 索引優化 |
 
 ## 設計理念差異
@@ -133,11 +155,8 @@ CREATE TABLE links (
 ## 實際影響
 
 ### Obsidian 有但 CLI 沒有的功能
-1. **區塊引用** (`^block-id`): CLI 無法追蹤或解析
-2. **精確位置跳轉**: CLI 無法提供行號/列號資訊
-3. **列表結構**: CLI 不追蹤列表的層級和結構
-4. **腳註**: CLI 不追蹤腳註定義和引用
-5. **嵌入檔案**: CLI 不追蹤嵌入的圖片或檔案
+1. **列表結構**: CLI 不追蹤列表的層級和結構（listItems）
+2. **腳註**: CLI 不追蹤腳註定義和引用（footnotes）
 
 ### CLI 有但 Obsidian 沒有的功能
 1. **持久化查詢**: CLI 的 SQLite 索引可跨會話使用
@@ -148,10 +167,8 @@ CREATE TABLE links (
 ## 建議
 
 ### 如果需要在 CLI 中支援更多 Obsidian 功能
-1. **區塊引用**: 在 parser 中提取 `^block-id` 並儲存區塊 ID
-2. **位置資訊**: 可選地儲存關鍵元素的位置（如標題、連結）
-3. **列表結構**: 解析列表層級和任務狀態
-4. **嵌入檔案**: 追蹤嵌入的檔案路徑
+1. **列表結構**: 解析列表層級和任務狀態（listItems）
+2. **腳註**: 追蹤腳註定義與引用（footnotes / footnoteRefs）
 
 ### 如果需要在 Obsidian 中使用 CLI 的功能
 1. **內容雜湊**: 可透過 plugin 計算並儲存在 frontmatter
@@ -162,4 +179,5 @@ CREATE TABLE links (
 
 - [Obsidian API Documentation](https://docs.obsidian.md/)
 - [Obsidian API Type Definitions](https://github.com/obsidianmd/obsidian-api)
-- SecondBrain CLI Source Code: `src/types/index.ts`, `src/utils/database.ts`, `src/utils/parser.ts`
+- [Obsidian 對齊指南](./obsidian-alignment-guide.md)
+- SecondBrain CLI: `src/types/index.ts`, `src/utils/database.ts`（`initTables` + `initObsidianTables`）, `src/utils/parser.ts`

@@ -60,7 +60,7 @@ sb orphans
 sb init                              # 初始化 vault
 sb config list                       # 查看設定
 sb config get dailyNotesFolder       # 取得特定設定
-sb config set dailyNotesFolder Daily # 修改設定
+sb config set dailyNotesFolder Daily # 修改設定（可編輯：dailyNotesFolder, templatesFolder）
 ```
 
 ### 筆記管理
@@ -73,6 +73,10 @@ sb capture "內容" \                  # 建立筆記
 
 sb search "關鍵字" \                 # 搜尋
   --tags="work" \
+  --path="Daily" \                  # 路徑前綴
+  --links-to="某筆記" \             # 只顯示連結到該筆記的檔案
+  --heading="標題文字" \            # 只顯示含該標題的檔案
+  --modified-after="2024-01-01" \   # 修改時間篩選
   --limit=10 \
   --format=json
 
