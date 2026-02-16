@@ -23,7 +23,15 @@
     "markdown",
     "knowledge-management"
   ],
-  "author": "",
+  "author": "novis10813",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/novis10813/secondbrain-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/novis10813/secondbrain-cli/issues"
+  },
+  "homepage": "https://github.com/novis10813/secondbrain-cli#readme",
   "license": "MIT",
   "dependencies": {
     "commander": "^12.0.0",
