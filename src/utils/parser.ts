@@ -10,7 +10,9 @@ import type {
 	TagCache,
 	EmbedCache,
 	BlockCache,
-	FrontMatterCache
+	FrontMatterCache,
+	FootnoteCache,
+	FootnoteRefCache
 } from '../types/index.js';
 import { rangeToPos } from './position.js';
 
@@ -72,6 +74,21 @@ export interface ListItemRef {
   position: Pos;
 }
 
+export interface FootnoteRef {
+  id: string;
+  line: number;
+  column: number;
+  position: Pos;
+}
+
+export interface FootnoteDef {
+  id: string;
+  content: string;
+  line: number;
+  column: number;
+  position: Pos;
+}
+
 export interface ParsedNote {
   title: string;
   content: string;
@@ -84,6 +101,8 @@ export interface ParsedNote {
   blockRefs: BlockRef[];
   embeds: EmbedRef[];
   listItems: ListItemRef[];
+  footnotes: FootnoteDef[];
+  footnoteRefs: FootnoteRef[];
 }
 
 export class NoteParser {
@@ -114,6 +133,8 @@ export class NoteParser {
     const embeds = this.extractEmbeds(body, codeRanges, content, bodyStartIndex);
     const blockRefs = this.mergeBlockRefsFromLinks(bodyBlockRefs, links, embeds);
     const listItems = this.extractListItems(body, codeRanges, content, bodyStartIndex);
+    const footnotes = this.extractFootnoteDefinitions(body, codeRanges, content, bodyStartIndex);
+    const footnoteRefs = this.extractFootnoteRefs(body, codeRanges, content, bodyStartIndex);
 
     return {
       title,
@@ -126,7 +147,9 @@ export class NoteParser {
       headingStructure,
       blockRefs,
       embeds,
-      listItems
+      listItems,
+      footnotes,
+      footnoteRefs
     };
   }
 
@@ -396,6 +419,55 @@ export class NoteParser {
     return result;
   }
 
+  private static extractFootnoteDefinitions(
+    body: string,
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number
+  ): FootnoteDef[] {
+    const result: FootnoteDef[] = [];
+    const definitionRegex = /^(\s*)\[\^([^\]]+)\]:\s*(.*)$/gm;
+    let match;
+    while ((match = definitionRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
+      const id = match[2].trim();
+      const contentText = (match[3] ?? '').trim();
+      const pos = this.indexToPosition(body, match.index);
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ id, content: contentText, line: pos.line, column: pos.column, position });
+    }
+    return result;
+  }
+
+  private static extractFootnoteRefs(
+    body: string,
+    codeRanges: Array<[number, number]>,
+    content: string,
+    bodyStartIndex: number
+  ): FootnoteRef[] {
+    const result: FootnoteRef[] = [];
+    const refRegex = /\[\^([^\]]+)\]/g;
+    let match;
+    while ((match = refRegex.exec(body)) !== null) {
+      if (this.isInCodeBlock(match.index, codeRanges)) continue;
+      const after = body[match.index + match[0].length];
+      if (after === ':') continue;
+      const id = match[1].trim();
+      const pos = this.indexToPosition(body, match.index);
+      const position = rangeToPos(
+        content,
+        bodyStartIndex + match.index,
+        bodyStartIndex + match.index + match[0].length
+      );
+      result.push({ id, line: pos.line, column: pos.column, position });
+    }
+    return result;
+  }
+
   private static extractLinksFromObject(obj: unknown, onLink: (target: string) => void): void {
     if (typeof obj === 'string') {
       const linkRegex = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
@@ -638,6 +710,27 @@ export class NoteParser {
 		// Convert list items
 		if (parsed.listItems.length > 0) {
 			metadata.listItems = this.listItemsToCache(parsed.listItems);
+		}
+
+		// Convert footnotes (definitions)
+		if (parsed.footnotes.length > 0) {
+			metadata.footnotes = parsed.footnotes.map(
+				(fn): FootnoteCache => ({
+					id: fn.id,
+					content: fn.content,
+					position: fn.position
+				})
+			);
+		}
+
+		// Convert footnote refs
+		if (parsed.footnoteRefs.length > 0) {
+			metadata.footnoteRefs = parsed.footnoteRefs.map(
+				(ref): FootnoteRefCache => ({
+					id: ref.id,
+					position: ref.position
+				})
+			);
 		}
 
 		return metadata;

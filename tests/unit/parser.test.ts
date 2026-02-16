@@ -1012,6 +1012,113 @@ See [[other#Heading#^block123]].`;
     });
   });
 
+  describe('footnote extraction', () => {
+    it('extracts footnote references [^id] from body', () => {
+      const content = `# Doc
+
+Text with [^1] and [^note] here.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.footnoteRefs).toHaveLength(2);
+      expect(parsed.footnoteRefs.map(r => r.id)).toEqual(['1', 'note']);
+    });
+
+    it('extracts footnote definitions [^id]: content at line start', () => {
+      const content = `# Doc
+
+Some text.
+
+[^1]: First footnote content
+[^note]: Second footnote here.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.footnotes).toHaveLength(2);
+      expect(parsed.footnotes[0]).toMatchObject({ id: '1', content: 'First footnote content' });
+      expect(parsed.footnotes[1]).toMatchObject({ id: 'note', content: 'Second footnote here.' });
+    });
+
+    it('does not treat definition [^id]: as a reference', () => {
+      const content = `# Doc
+
+[^1]: Only definition, no ref in text.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.footnotes).toHaveLength(1);
+      expect(parsed.footnotes[0].id).toBe('1');
+      expect(parsed.footnoteRefs).toHaveLength(0);
+    });
+
+    it('footnote refs and definitions include position (line, column)', () => {
+      const content = `# Doc
+
+See [^1] here.
+
+[^1]: The footnote.`;
+
+      const parsed = NoteParser.parse(content);
+
+      const ref = parsed.footnoteRefs.find(r => r.id === '1');
+      const def = parsed.footnotes.find(f => f.id === '1');
+      expect(ref).toBeDefined();
+      expect(ref!.line).toBe(3);
+      expect(ref!.column).toBeGreaterThan(0);
+      expect(def).toBeDefined();
+      expect(def!.line).toBeGreaterThan(ref!.line);
+      expect(def!.content).toBe('The footnote.');
+    });
+
+    it('does not extract footnotes inside code blocks', () => {
+      const content = `# Doc
+
+Real ref [^1].
+
+\`\`\`
+[^fake]: in code block
+\`\`\`
+
+Inline \`[^also-fake]\` ignored.`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.footnoteRefs).toHaveLength(1);
+      expect(parsed.footnoteRefs[0].id).toBe('1');
+      expect(parsed.footnotes).toHaveLength(0);
+    });
+
+    it('extracts multiple refs to same id', () => {
+      const content = `# Doc
+
+First [^1] and again [^1].`;
+
+      const parsed = NoteParser.parse(content);
+
+      expect(parsed.footnoteRefs).toHaveLength(2);
+      expect(parsed.footnoteRefs[0].id).toBe('1');
+      expect(parsed.footnoteRefs[1].id).toBe('1');
+    });
+
+    it('parsedToContentMetadata includes footnotes and footnoteRefs', () => {
+      const content = `# Doc
+
+See [^a] and [^b].
+
+[^a]: Def A
+[^b]: Def B`;
+
+      const parsed = NoteParser.parse(content);
+      const meta = NoteParser.parsedToContentMetadata(parsed, content);
+
+      expect(meta.footnotes).toHaveLength(2);
+      expect(meta.footnotes!.some(f => f.id === 'a' && f.content === 'Def A')).toBe(true);
+      expect(meta.footnotes!.some(f => f.id === 'b' && f.content === 'Def B')).toBe(true);
+      expect(meta.footnoteRefs).toHaveLength(2);
+      expect(meta.footnoteRefs!.map(r => r.id)).toEqual(['a', 'b']);
+    });
+  });
+
   describe('parsedToContentMetadata', () => {
     it('converts ParsedNote to ContentMetadata with links, tags, headings, blocks', () => {
       const content = `# Title
