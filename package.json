@@ -17,6 +17,7 @@
     "build": "tsc",
     "dev": "bun run src/index.ts",
     "test": "bun test",
+    "test:perf": "bun test tests/perf",
     "lint": "tsc --noEmit",
     "prepare": "npm run build"
   },

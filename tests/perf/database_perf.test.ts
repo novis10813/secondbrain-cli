@@ -48,10 +48,26 @@ describe('Database Performance', () => {
   });
 
   it('should load all notes correctly with batch optimization', () => {
-    // This test verifies the batch loading works (actual query counting to be added later)
     const notes = db.getAllNotes();
     expect(notes).toHaveLength(100);
-    // Note: Query counting mechanism can be added here in future to assert query count <= 3
+  });
+
+  it('getAllNotes(100) completes within acceptable time', () => {
+    const start = performance.now();
+    const notes = db.getAllNotes();
+    const elapsed = performance.now() - start;
+    expect(notes).toHaveLength(100);
+    expect(elapsed).toBeLessThan(200);
+  });
+
+  it('getNoteById lookups complete within acceptable time', () => {
+    const iterations = 100;
+    const start = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      db.getNoteById(`note-${i}`);
+    }
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(100);
   });
 
   it('should not churn links when content unchanged', () => {
