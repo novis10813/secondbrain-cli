@@ -9,10 +9,11 @@ const DEFAULT_VAULT_PATH = join(homedir(), 'vault');
 export function createInitCommand(): Command {
   const command = new Command('init')
     .description('Initialize a new SecondBrain vault (alias for `sb vault init`)')
-    .argument('[path]', 'Vault path', DEFAULT_VAULT_PATH)
-    .action((path: string) => {
+    .option('-p, --path <path>', 'Vault path', process.cwd())
+    .argument('[path]', 'Vault path')
+    .action((path?: string, options?: { path?: string }) => {
       try {
-        const vaultPath = resolve(path);
+        const vaultPath = resolve(path ?? options?.path ?? DEFAULT_VAULT_PATH);
         const configManager = new ConfigManager(vaultPath);
         const globalConfig = new GlobalConfigManager();
 

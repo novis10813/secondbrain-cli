@@ -10,8 +10,8 @@ const CONFIG_FILE = 'vaults.json';
 export class GlobalConfigManager {
   private configDir: string;
 
-  constructor(configDir: string = DEFAULT_CONFIG_DIR) {
-    this.configDir = configDir;
+  constructor(configDir?: string) {
+    this.configDir = configDir ?? process.env.SECONDBRAIN_CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
   }
 
   get configPath(): string {
