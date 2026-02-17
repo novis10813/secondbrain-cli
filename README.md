@@ -66,6 +66,59 @@ sb config get dailyNotesFolder       # 取得特定設定
 sb config set dailyNotesFolder Daily # 修改設定（可編輯：dailyNotesFolder, templatesFolder）
 ```
 
+### Vault 管理
+
+SecondBrain 支援管理多個 vault。你可以從任何目錄使用 `sb` 指令，透過設定 active vault。
+
+#### 初始化 vault
+
+```bash
+# 在預設位置初始化 (~/vault/)
+sb vault init
+
+# 在當前目錄初始化
+sb vault init .
+
+# 在指定路徑初始化
+sb vault init /path/to/my-notes
+```
+
+#### 切換 vault
+
+```bash
+# 列出所有已註冊的 vault
+sb vault list
+
+# 設定當前 session 的 active vault（使用 eval）
+eval $(sb vault use my-notes)
+
+# 查看當前 active vault
+sb vault current
+```
+
+#### 設定預設 vault
+
+```bash
+# 查看預設 vault
+sb vault default
+
+# 設定預設 vault
+sb vault default set my-notes
+```
+
+#### 移除 vault 註冊
+
+```bash
+# 從註冊表中移除 vault（不會刪除檔案）
+sb vault delete my-notes
+```
+
+#### Vault 解析優先順序
+
+1. `SECONDBRAIN_VAULT` 環境變數（名稱或路徑）
+2. 當前目錄（向上查找 `.secondbrain/`）
+3. 預設 vault
+
 ### 筆記管理
 
 ```bash
