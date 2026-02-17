@@ -16,4 +16,4 @@ Index of technical documentation for the codebase.
 
 - **Entry point**: `src/index.ts` (Commander.js, registers all commands)
 - **Config**: `.secondbrain/config.json`; DB: `.secondbrain/index.db`
-- **Stack**: Bun, TypeScript, Commander.js, SQLite (bun:sqlite), YAML (frontmatter)
+- **Stack**: Bun/Node, TypeScript, Commander.js, SQLite (better-sqlite3), YAML (frontmatter)

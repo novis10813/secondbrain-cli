@@ -17,7 +17,7 @@
 npm install -g @novis10813/secondbrain-cli
 ```
 
-> 注意：此 CLI 目前使用 `bun:sqlite`，因此執行時需要 **Bun runtime**。如果你用 `npm` 安裝但系統沒有 `bun`，`sb` 會無法執行。
+支援 **Node.js 18+** 與 **Bun**。使用 `npm install` 安裝後，可用 `node dist/index.js` 或 `npx sb` 執行；專案開發與測試建議使用 Bun（`bun test`）。
 
 如果你用 `bun` 從 GitHub 安裝並看到 `Blocked ... postinstall/prepare`，需要先信任再重裝一次：
 

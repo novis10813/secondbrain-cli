@@ -6,7 +6,7 @@
 
 **Architecture:** Refactor `DatabaseManager` to handle UPSERTs correctly and avoid N+1 queries using optimized SQL. Implement a two-pass sync mechanism in `VaultManager` to ensure all links are resolved against a populated database. Refine the parser to respect code blocks and fix date localization issues.
 
-**Tech Stack:** TypeScript, Bun, SQLite (bun:sqlite), Commander.js.
+**Tech Stack:** TypeScript, Bun/Node, SQLite (better-sqlite3), Commander.js.
 
 ---
 

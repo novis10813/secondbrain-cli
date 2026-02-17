@@ -19,7 +19,8 @@
     "test": "bun test",
     "test:perf": "bun test tests/perf",
     "lint": "tsc --noEmit",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "check": "tsc --noEmit"
   },
   "keywords": [
     "obsidian",
@@ -41,10 +42,12 @@
   "homepage": "https://github.com/novis10813/secondbrain-cli#readme",
   "license": "MIT",
   "dependencies": {
+    "better-sqlite3": "^11.6.0",
     "commander": "^12.0.0",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3"
   },

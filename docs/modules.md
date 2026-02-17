@@ -14,7 +14,7 @@ Config type: `vaultPath`, `dailyNotesFolder`, `templatesFolder`, `dbPath`.
 
 ### database.ts — DatabaseManager
 
-SQLite access and schema. Uses `bun:sqlite`; enables `PRAGMA foreign_keys = ON`.
+SQLite access and schema. Uses `better-sqlite3`; enables `PRAGMA foreign_keys = ON`.
 
 - **Constructor**: `DatabaseManager(config: Config)` — opens `config.dbPath`, runs `initTables()` and `initObsidianTables()`.
 - **Legacy**: `notes`, `links` tables; `upsertNote()`, `getNoteByPath()`, `getAllNotes()`, link resolution helpers.

@@ -57,7 +57,7 @@ Fight entropy. Leave the codebase better than you found it.
 - Runtime: Bun (with Node.js fallback)
 - Language: TypeScript (strict mode)
 - Package Manager: Bun/npm
-- Database: SQLite (bun:sqlite)
+- Database: SQLite (better-sqlite3)
 - CLI Framework: Commander.js
 
 ### Directory Structure
