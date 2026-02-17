@@ -1,23 +1,45 @@
 import { basename, extname, dirname } from 'path';
 import type { Note, Config, GraphData, FileInfo, ContentMetadata } from '../types/index.js';
-import { Database } from 'bun:sqlite';
+import { createDatabase, type SqliteDatabase } from './sqlite-adapter.js';
 import { NoteParser } from './parser.js';
 import * as yaml from 'yaml';
 
+/** Row shape from SELECT * FROM files */
+interface FilesRow {
+  path: string;
+  name: string;
+  basename: string;
+  extension: string;
+  parent: string | null;
+  ctime: number;
+  mtime: number;
+  size: number;
+  content_hash?: string;
+}
+
 export class DatabaseManager {
-  private db: Database;
+  private db: SqliteDatabase;
   private config: Config;
 
   constructor(config: Config) {
     this.config = config;
-    this.db = new Database(config.dbPath);
-    // Enable foreign keys
+    this.db = createDatabase(config.dbPath);
     this.db.exec('PRAGMA foreign_keys = ON');
     this.initTables();
   }
 
   private initTables(): void {
-    // Notes table
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)
+    `);
+    const versionRow = this.db.prepare('SELECT version FROM schema_version LIMIT 1').get() as
+      | { version: number }
+      | undefined;
+    const currentVersion = versionRow?.version ?? 0;
+    if (currentVersion === 0) {
+      this.db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)').run(0);
+    }
+    // Notes table (minimal schema; runMigrations adds block_refs, embeds, headings, parent, etc.)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS notes (
         id TEXT PRIMARY KEY,
@@ -26,50 +48,13 @@ export class DatabaseManager {
         content TEXT NOT NULL,
         frontmatter TEXT NOT NULL,
         tags TEXT NOT NULL,
-        block_refs TEXT NOT NULL DEFAULT '[]',
-        embeds TEXT NOT NULL DEFAULT '[]',
-        headings TEXT NOT NULL DEFAULT '[]',
         hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
         modified_at TEXT NOT NULL
       )
     `);
 
-    // Migration: add block_refs to existing tables
-    try {
-      this.db.exec(`ALTER TABLE notes ADD COLUMN block_refs TEXT NOT NULL DEFAULT '[]'`);
-    } catch {
-      // Column already exists
-    }
-
-    // Migration: add embeds to existing tables
-    try {
-      this.db.exec(`ALTER TABLE notes ADD COLUMN embeds TEXT NOT NULL DEFAULT '[]'`);
-    } catch {
-      // Column already exists
-    }
-
-    // Migration: add headings to existing tables
-    try {
-      this.db.exec(`ALTER TABLE notes ADD COLUMN headings TEXT NOT NULL DEFAULT '[]'`);
-    } catch {
-      // Column already exists
-    }
-
-    // TFile-aligned columns (parent, basename, ctime, mtime, size)
-    for (const col of [
-      'parent TEXT',
-      'basename TEXT',
-      'ctime INTEGER',
-      'mtime INTEGER',
-      'size INTEGER'
-    ]) {
-      try {
-        this.db.exec(`ALTER TABLE notes ADD COLUMN ${col}`);
-      } catch {
-        // Column already exists
-      }
-    }
+    this.runMigrations(currentVersion);
 
     // Links table (many-to-many)
     this.db.exec(`
@@ -92,6 +77,34 @@ export class DatabaseManager {
 
     // New Obsidian-aligned tables
     this.initObsidianTables();
+  }
+
+  /** Run schema migrations for notes table (idempotent ALTERs for existing DBs). */
+  private runMigrations(currentVersion: number): void {
+    if (currentVersion < 1) {
+      for (const sql of [
+        `ALTER TABLE notes ADD COLUMN block_refs TEXT NOT NULL DEFAULT '[]'`,
+        `ALTER TABLE notes ADD COLUMN embeds TEXT NOT NULL DEFAULT '[]'`,
+        `ALTER TABLE notes ADD COLUMN headings TEXT NOT NULL DEFAULT '[]'`
+      ]) {
+        try {
+          this.db.exec(sql);
+        } catch {
+          /* column already exists */
+        }
+      }
+      this.db.prepare('UPDATE schema_version SET version = ?').run(1);
+    }
+    if (currentVersion < 2) {
+      for (const col of ['parent TEXT', 'basename TEXT', 'ctime INTEGER', 'mtime INTEGER', 'size INTEGER']) {
+        try {
+          this.db.exec(`ALTER TABLE notes ADD COLUMN ${col}`);
+        } catch {
+          /* column already exists */
+        }
+      }
+      this.db.prepare('UPDATE schema_version SET version = ?').run(2);
+    }
   }
 
   private initObsidianTables(): void {
@@ -338,6 +351,17 @@ export class DatabaseManager {
     this.db.close();
   }
 
+  private rowToFileInfo(row: FilesRow): FileInfo {
+    return {
+      path: row.path,
+      name: row.name,
+      basename: row.basename,
+      extension: row.extension,
+      parent: row.parent,
+      stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
+    };
+  }
+
   // FileInfo operations
   upsertFile(file: FileInfo, contentHash: string): void {
     const stmt = this.db.prepare(`
@@ -368,47 +392,25 @@ export class DatabaseManager {
   }
 
   getFileByPath(path: string): FileInfo | null {
-    const row = this.db.prepare('SELECT * FROM files WHERE path = ?').get(path) as any;
-    if (!row) return null;
-
-    return {
-      path: row.path,
-      name: row.name,
-      basename: row.basename,
-      extension: row.extension,
-      parent: row.parent,
-      stat: {
-        ctime: row.ctime,
-        mtime: row.mtime,
-        size: row.size
-      }
-    };
+    const row = this.db.prepare('SELECT * FROM files WHERE path = ?').get(path) as FilesRow | undefined;
+    return row ? this.rowToFileInfo(row) : null;
   }
 
-	deleteFile(path: string): void {
-		this.db.prepare('DELETE FROM files WHERE path = ?').run(path);
-	}
+  deleteFile(path: string): void {
+    this.db.prepare('DELETE FROM files WHERE path = ?').run(path);
+  }
 
-	getAllFiles(): FileInfo[] {
-		const rows = this.db.prepare('SELECT * FROM files').all() as any[];
-		return rows.map(row => ({
-			path: row.path,
-			name: row.name,
-			basename: row.basename,
-			extension: row.extension,
-			parent: row.parent,
-			stat: {
-				ctime: row.ctime,
-				mtime: row.mtime,
-				size: row.size
-			}
-		}));
-	}
+  getAllFiles(): FileInfo[] {
+    const rows = this.db.prepare('SELECT * FROM files').all() as FilesRow[];
+    return rows.map((row) => this.rowToFileInfo(row));
+  }
 
-	getFileContentHash(filePath: string): string | null {
-		const row = this.db.prepare('SELECT content_hash FROM files WHERE path = ?').get(filePath) as any;
-		return row?.content_hash ?? null;
-	}
+  getFileContentHash(filePath: string): string | null {
+    const row = this.db.prepare('SELECT content_hash FROM files WHERE path = ?').get(filePath) as
+      | { content_hash: string }
+      | undefined;
+    return row?.content_hash ?? null;
+  }
 
 	/**
 	 * Update link target in links_with_positions table.
@@ -423,43 +425,37 @@ export class DatabaseManager {
 		stmt.run(targetPath, targetId, sourcePath, startOffset);
 	}
 
-	/** Get files that link to the given file path (new structure). */
-	getBacklinksByPath(filePath: string): FileInfo[] {
-		const rows = this.db.prepare(`
-			SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
-			FROM files f
-			INNER JOIN (SELECT DISTINCT source_path FROM links_with_positions WHERE target_path = ?) l
-				ON f.path = l.source_path
-		`).all(filePath) as any[];
-		return rows.map(row => ({
-			path: row.path,
-			name: row.name,
-			basename: row.basename,
-			extension: row.extension,
-			parent: row.parent,
-			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
-		}));
-	}
+  /** Get files that link to the given file path (new structure). */
+  getBacklinksByPath(filePath: string): FileInfo[] {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
+      FROM files f
+      INNER JOIN (SELECT DISTINCT source_path FROM links_with_positions WHERE target_path = ?) l
+        ON f.path = l.source_path
+    `
+      )
+      .all(filePath) as FilesRow[];
+    return rows.map((row) => this.rowToFileInfo(row));
+  }
 
-	/** Get files that the given file links to (outgoing links, new structure). */
-	getOutlinksByPath(filePath: string): FileInfo[] {
-		const rows = this.db.prepare(`
-			SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
-			FROM files f
-			INNER JOIN (
-				SELECT DISTINCT target_path FROM links_with_positions
-				WHERE source_path = ? AND target_path IS NOT NULL AND target_path != ''
-			) l ON f.path = l.target_path
-		`).all(filePath) as any[];
-		return rows.map(row => ({
-			path: row.path,
-			name: row.name,
-			basename: row.basename,
-			extension: row.extension,
-			parent: row.parent,
-			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
-		}));
-	}
+  /** Get files that the given file links to (outgoing links, new structure). */
+  getOutlinksByPath(filePath: string): FileInfo[] {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT f.path, f.name, f.basename, f.extension, f.parent, f.ctime, f.mtime, f.size
+      FROM files f
+      INNER JOIN (
+        SELECT DISTINCT target_path FROM links_with_positions
+        WHERE source_path = ? AND target_path IS NOT NULL AND target_path != ''
+      ) l ON f.path = l.target_path
+    `
+      )
+      .all(filePath) as FilesRow[];
+    return rows.map((row) => this.rowToFileInfo(row));
+  }
 
 	/**
 	 * Get start position of a heading in a file. Matches by exact heading text or Obsidian-style slug.
@@ -490,22 +486,19 @@ export class DatabaseManager {
 		return row ? { line: row.start_line, col: row.start_col } : null;
 	}
 
-	/** Get files with no incoming or outgoing links (new structure). */
-	getOrphanFiles(): FileInfo[] {
-		const rows = this.db.prepare(`
-			SELECT * FROM files f
-			WHERE NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.source_path = f.path)
-			AND NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.target_path = f.path)
-		`).all() as any[];
-		return rows.map(row => ({
-			path: row.path,
-			name: row.name,
-			basename: row.basename,
-			extension: row.extension,
-			parent: row.parent,
-			stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
-		}));
-	}
+  /** Get files with no incoming or outgoing links (new structure). */
+  getOrphanFiles(): FileInfo[] {
+    const rows = this.db
+      .prepare(
+        `
+      SELECT * FROM files f
+      WHERE NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.source_path = f.path)
+      AND NOT EXISTS (SELECT 1 FROM links_with_positions l WHERE l.target_path = f.path)
+    `
+      )
+      .all() as FilesRow[];
+    return rows.map((row) => this.rowToFileInfo(row));
+  }
 
 	/** Search files by path/basename, optional tags, path prefix, links-to target, heading, or mtime (new structure). */
 	searchFiles(
@@ -549,21 +542,14 @@ export class DatabaseManager {
 			sql += ` AND f.mtime <= ?`;
 			params.push(modifiedBefore);
 		}
-		sql += ` ORDER BY f.mtime DESC LIMIT ?`;
-		params.push(limit);
-		const rows = this.db.prepare(sql).all(...params) as any[];
-		return rows.map(row => ({
-			file: {
-				path: row.path,
-				name: row.name,
-				basename: row.basename,
-				extension: row.extension,
-				parent: row.parent,
-				stat: { ctime: row.ctime, mtime: row.mtime, size: row.size }
-			},
-			tags: row.tags_str ? row.tags_str.split(',') : []
-		}));
-	}
+    sql += ` ORDER BY f.mtime DESC LIMIT ?`;
+    params.push(limit);
+    const rows = this.db.prepare(sql).all(...params) as (FilesRow & { tags_str: string | null })[];
+    return rows.map((row) => ({
+      file: this.rowToFileInfo(row),
+      tags: row.tags_str ? row.tags_str.split(',') : []
+    }));
+  }
 
   // ContentMetadata operations
   upsertContentMetadata(filePath: string, metadata: ContentMetadata, contentHash: string): void {
@@ -1053,7 +1039,7 @@ export class DatabaseManager {
     const toAdd = targetIds.filter(id => !existingSet.has(id));
     
     // Links to remove (in existingSet but not in newSet)
-    const toRemove = existingLinks.filter(id => !newSet.has(id));
+    const toRemove = existingLinks.filter((id: string) => !newSet.has(id));
     
     // Skip if no changes
     if (toAdd.length === 0 && toRemove.length === 0) {

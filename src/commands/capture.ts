@@ -11,9 +11,8 @@ export function createCaptureCommand(): Command {
     .option('--template <template>', 'Template name')
     .option('--path <path>', 'Custom file path')
     .action(async (content, options) => {
-      try {
-        const body = content ?? '';
-        await withVault(async (vault) => {
+      const body = content ?? '';
+      await withVault(async (vault) => {
           let notePath: string;
           let noteContent: string;
           let frontmatter: Record<string, unknown> = {};
@@ -64,11 +63,7 @@ export function createCaptureCommand(): Command {
             title,
             tags
           }, null, 2));
-        });
-      } catch (error) {
-        console.error('❌ Failed to capture note:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
-      }
+      });
     });
 
   return command;

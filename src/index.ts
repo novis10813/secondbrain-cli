@@ -13,7 +13,14 @@ import { createStatsCommand } from './commands/stats.js';
 import { createOrphansCommand } from './commands/orphans.js';
 import { createConfigCommand } from './commands/config.js';
 import { createMigrateCommand } from './commands/migrate.js';
-import pkg = require('../package.json');
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+
+// Resolve package.json relative to the entry script (works for dist/index.js and bun run src/index.ts)
+const entryDir = dirname(process.argv[1] ?? '');
+const pkg = JSON.parse(
+  readFileSync(join(entryDir, '..', 'package.json'), 'utf-8')
+) as { version: string };
 
 const program = new Command();
 

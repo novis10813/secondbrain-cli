@@ -21,6 +21,9 @@ export async function withVault(
   const vault = new VaultManager(config);
   try {
     await fn(vault);
+  } catch (error) {
+    console.error('❌', error instanceof Error ? error.message : String(error));
+    process.exit(1);
   } finally {
     vault.close();
   }

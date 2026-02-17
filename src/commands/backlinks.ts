@@ -7,16 +7,14 @@ export function createBacklinksCommand(): Command {
     .argument('<path-or-id>', 'File path or basename')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action(async (pathOrId, options) => {
-      try {
-        await withVault((vault) => {
-          const file = vault.resolvePathOrBasename(pathOrId);
-          const resolvedPath = file?.path ?? null;
-          if (!resolvedPath) {
-            console.error('❌ Note not found');
-            process.exit(1);
-          }
+      await withVault((vault) => {
+        const file = vault.resolvePathOrBasename(pathOrId);
+        const resolvedPath = file?.path ?? null;
+        if (!resolvedPath) {
+          throw new Error('Note not found');
+        }
 
-          const backlinks = vault.getBacklinksByPath(resolvedPath);
+        const backlinks = vault.getBacklinksByPath(resolvedPath);
           const title = file?.basename ?? resolvedPath.replace(/\.md$/, '');
 
           if (options.format === 'json') {
@@ -41,11 +39,7 @@ export function createBacklinksCommand(): Command {
               });
             }
           }
-        });
-      } catch (error) {
-        console.error('❌ Failed to get backlinks:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
-      }
+      });
     });
 
   return command;

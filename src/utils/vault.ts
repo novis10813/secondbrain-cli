@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSy
 import { join, relative, dirname, basename, extname } from 'path';
 import type { Note, Config, FileInfo, ContentMetadata } from '../types/index.js';
 import { DatabaseManager } from './database.js';
-import { NoteParser } from './parser.js';
+import { NoteParser, type ParsedNote } from './parser.js';
 
 export class VaultManager {
   private config: Config;
@@ -31,40 +31,33 @@ export class VaultManager {
 
 		const currentPaths = new Set<string>();
 		const markdownFiles = this.findMarkdownFiles();
+		const parsedByPath = new Map<string, ParsedNote>();
 
-		// Pass 1: Collect all files and upsert FileInfo + ContentMetadata
+		// Pass 1: Collect all files, parse once, upsert FileInfo + ContentMetadata
 		for (const filePath of markdownFiles) {
 			const relativePath = relative(this.config.vaultPath, filePath);
 			currentPaths.add(relativePath);
 
 			const content = readFileSync(filePath, 'utf-8');
-			const hash = NoteParser.computeHash(content);
+			const parsed = NoteParser.parse(content);
+			parsedByPath.set(relativePath, parsed);
 
-			// Check if file exists and if content hash changed
+			const hash = NoteParser.computeHash(content);
 			const existingFile = this.db.getFileByPath(relativePath);
 			const isNew = !existingFile;
-			// Check if content hash changed
 			const existingHash = this.db.getFileContentHash(relativePath);
 			const isUpdated = existingHash !== null && existingHash !== hash;
 
 			if (isNew || isUpdated) {
-				// Create FileInfo from file system
 				const fileInfo = this.createFileInfo(relativePath, filePath);
-				
-				// Parse content to get ContentMetadata
-				const parsed = NoteParser.parse(content);
 				const contentMetadata = NoteParser.parsedToContentMetadata(parsed, content);
 
-				// Upsert FileInfo and ContentMetadata separately (new structure)
 				this.db.upsertFile(fileInfo, hash);
 				this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
 
-				// Also update notes table for backward compatibility
-				// Link resolution uses new structure (getFirstLinkpathDest); graph uses links_with_positions
 				const linkIds: string[] = [];
 				const note = await this.createNoteFromFile(relativePath, content, hash, linkIds);
 				if (!isNew) {
-					// Preserve ID for updated notes
 					const existingNote = this.db.getNoteByPath(relativePath);
 					if (existingNote) {
 						note.id = existingNote.id;
@@ -80,12 +73,8 @@ export class VaultManager {
 			}
 		}
 
-		// Pass 2: Resolve link targets using new structure; update links_with_positions
-		for (const filePath of markdownFiles) {
-			const relativePath = relative(this.config.vaultPath, filePath);
-			const content = readFileSync(filePath, 'utf-8');
-			const parsed = NoteParser.parse(content);
-
+		// Pass 2: Resolve link targets using cached parsed data (no second read/parse)
+		for (const [relativePath, parsed] of parsedByPath) {
 			for (const link of parsed.links) {
 				const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
 				if (linkedFile) {
@@ -112,12 +101,15 @@ export class VaultManager {
 
     const walk = (dir: string) => {
       const entries = readdirSync(dir, { withFileTypes: true });
-      
+
       for (const entry of entries) {
         const fullPath = join(dir, entry.name);
-        
+
         if (entry.isDirectory() && !excludeDirs.includes(entry.name)) {
-          walk(fullPath);
+          // Skip symlinked directories to avoid cycles and duplicate traversal
+          if (!entry.isSymbolicLink()) {
+            walk(fullPath);
+          }
         } else if (entry.isFile() && extname(entry.name) === '.md') {
           files.push(fullPath);
         }

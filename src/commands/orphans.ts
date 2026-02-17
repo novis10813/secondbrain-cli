@@ -6,34 +6,29 @@ export function createOrphansCommand(): Command {
     .description('Find notes with no links (orphans)')
     .option('-f, --format <format>', 'Output format (json|text)', 'text')
     .action(async (options) => {
-      try {
-        await withVault((vault) => {
-          const orphans = vault.getOrphanFiles();
-          if (options.format === 'json') {
-            console.log(JSON.stringify({
-              count: orphans.length,
-              orphans: orphans.map(o => ({
-                path: o.path,
-                basename: o.basename
-              }))
-            }, null, 2));
+      await withVault((vault) => {
+        const orphans = vault.getOrphanFiles();
+        if (options.format === 'json') {
+          console.log(JSON.stringify({
+            count: orphans.length,
+            orphans: orphans.map(o => ({
+              path: o.path,
+              basename: o.basename
+            }))
+          }, null, 2));
+        } else {
+          if (orphans.length === 0) {
+            console.log('✅ No orphan notes found. All notes are connected!');
           } else {
-            if (orphans.length === 0) {
-              console.log('✅ No orphan notes found. All notes are connected!');
-            } else {
-              console.log(`⚠️  Found ${orphans.length} orphan note(s):\n`);
-              orphans.forEach((file, i) => {
-                console.log(`${i + 1}. ${file.basename}`);
-                console.log(`   Path: ${file.path}`);
-                console.log();
-              });
-            }
+            console.log(`⚠️  Found ${orphans.length} orphan note(s):\n`);
+            orphans.forEach((file, i) => {
+              console.log(`${i + 1}. ${file.basename}`);
+              console.log(`   Path: ${file.path}`);
+              console.log();
+            });
           }
-        });
-      } catch (error) {
-        console.error('❌ Failed to get orphans:', error instanceof Error ? error.message : String(error));
-        process.exit(1);
-      }
+        }
+      });
     });
 
   return command;
