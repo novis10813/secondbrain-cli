@@ -2,6 +2,7 @@
 
 import { Command } from 'commander';
 import { createInitCommand } from './commands/init.js';
+import { createVaultCommand } from './commands/vault.js';
 import { createCaptureCommand } from './commands/capture.js';
 import { createSearchCommand } from './commands/search.js';
 import { createGetCommand } from './commands/get.js';
@@ -31,6 +32,7 @@ program
 
 // Add commands
 program.addCommand(createInitCommand());
+program.addCommand(createVaultCommand());
 program.addCommand(createCaptureCommand());
 program.addCommand(createSearchCommand());
 program.addCommand(createGetCommand());
