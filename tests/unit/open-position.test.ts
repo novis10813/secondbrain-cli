@@ -9,7 +9,7 @@ import { tmpdir } from 'os';
 
 describe('Position-based navigation', () => {
   describe('DatabaseManager.getHeadingPosition', () => {
-    const dbPath = 'test-open-position.db';
+    const dbPath = join(tmpdir(), 'secondbrain-test-open-position.db');
     const config: Config = {
       vaultPath: '.',
       dailyNotesFolder: 'Daily',
@@ -90,7 +90,7 @@ describe('Position-based navigation', () => {
   });
 
   describe('DatabaseManager.getBlockPosition', () => {
-    const dbPath = 'test-open-block.db';
+    const dbPath = join(tmpdir(), 'secondbrain-test-open-block.db');
     const config: Config = {
       vaultPath: '.',
       dailyNotesFolder: 'Daily',

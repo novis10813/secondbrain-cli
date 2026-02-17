@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { DatabaseManager } from '../../src/utils/database';
 import { Config } from '../../src/types';
 import { unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('DatabaseManager Upsert', () => {
-  const dbPath = 'test-upsert.db';
+  const dbPath = join(tmpdir(), 'secondbrain-test-upsert.db');
   const config: Config = { vaultPath: '.', dailyNotesFolder: 'Daily', templatesFolder: 'Templates', dbPath };
 
   beforeEach(() => {

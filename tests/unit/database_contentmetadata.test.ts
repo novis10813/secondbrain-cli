@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { DatabaseManager } from '../../src/utils/database';
 import { Config, FileInfo, ContentMetadata } from '../../src/types';
 import { unlinkSync, existsSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('DatabaseManager ContentMetadata Operations', () => {
-  const dbPath = 'test-contentmetadata.db';
+  const dbPath = join(tmpdir(), 'secondbrain-test-contentmetadata.db');
   const config: Config = {
     vaultPath: '.',
     dailyNotesFolder: 'Daily',
