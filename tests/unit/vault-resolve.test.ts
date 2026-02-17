@@ -74,6 +74,28 @@ describe('vault-resolve', () => {
         process.cwd = origCwd;
       }
     });
+
+    it('exits when fn throws', async () => {
+      const configManager = new ConfigManager(tempDir);
+      configManager.init();
+      const origCwd = process.cwd;
+      process.cwd = () => tempDir;
+      const exit = process.exit;
+      (process as NodeJS.Process & { exit: (code?: number) => never }).exit = ((code?: number) => {
+        throw new Error(`exit:${code}`);
+      }) as (code?: number) => never;
+      try {
+        await withVault(() => {
+          throw new Error('callback error');
+        });
+        expect.unreachable();
+      } catch (e) {
+        expect((e as Error).message).toBe('exit:1');
+      } finally {
+        process.exit = exit;
+        process.cwd = origCwd;
+      }
+    });
   });
 
   describe('getConfigOrExit', () => {

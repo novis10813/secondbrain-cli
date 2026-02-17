@@ -92,4 +92,22 @@ describe('resolveVaultPath', () => {
     });
     expect(result).toBeNull();
   });
+
+  it('should fall through when SECONDBRAIN_VAULT is set but invalid (path not a vault)', () => {
+    process.env.SECONDBRAIN_VAULT = '/nonexistent/not-a-vault';
+    const result = resolveVaultPath({
+      globalConfigDir: testConfigDir,
+      cwd: '/some/random/path'
+    });
+    expect(result).toBeNull();
+  });
+
+  it('should fall through when SECONDBRAIN_VAULT is set to unknown name', () => {
+    process.env.SECONDBRAIN_VAULT = 'unknown-vault-name';
+    const result = resolveVaultPath({
+      globalConfigDir: testConfigDir,
+      cwd: '/some/random/path'
+    });
+    expect(result).toBeNull();
+  });
 });
