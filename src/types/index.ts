@@ -224,3 +224,15 @@ export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+/** 單一 Vault 的註冊資訊 */
+export interface VaultEntry {
+  name: string;
+  path: string;
+}
+
+/** 全域設定檔結構 (~/.config/secondbrain/vaults.json) */
+export interface GlobalConfig {
+  vaults: VaultEntry[];
+  default?: string;
+}
