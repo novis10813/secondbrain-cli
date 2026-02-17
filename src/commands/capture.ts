@@ -1,8 +1,6 @@
 import { Command } from 'commander';
-import { ConfigManager } from '../utils/config.js';
-import { VaultManager } from '../utils/vault.js';
+import { withVault } from '../utils/vault-resolve.js';
 import { NoteParser } from '../utils/parser.js';
-import { join } from 'path';
 
 export function createCaptureCommand(): Command {
   const command = new Command('capture')
@@ -15,78 +13,58 @@ export function createCaptureCommand(): Command {
     .action(async (content, options) => {
       try {
         const body = content ?? '';
-        const vaultPath = ConfigManager.findVaultPath();
-        if (!vaultPath) {
-          console.error('❌ Not in a SecondBrain vault. Run `sb init` first.');
-          process.exit(1);
-        }
+        await withVault(async (vault) => {
+          let notePath: string;
+          let noteContent: string;
+          let frontmatter: Record<string, unknown> = {};
 
-        const configManager = new ConfigManager(vaultPath);
-        const config = configManager.getConfig();
-        const vault = new VaultManager(config);
+          const tags = options.tags ? options.tags.split(',').map((t: string) => t.trim()) : [];
 
-        let notePath: string;
-        let noteContent: string;
-        let frontmatter: Record<string, unknown> = {};
-
-        // Handle tags
-        const tags = options.tags ? options.tags.split(',').map((t: string) => t.trim()) : [];
-        
-        // Handle template
-        if (options.template) {
-          const templatePath = vault.getTemplatePath(options.template);
-          const templateContent = vault.readNote(templatePath);
-          
-          if (templateContent) {
-            const parsed = NoteParser.parse(templateContent);
-            frontmatter = parsed.frontmatter;
-            // Merge tags
-            if (parsed.tags.length > 0) {
-              tags.push(...parsed.tags.map(t => t.name));
+          if (options.template) {
+            const templatePath = vault.getTemplatePath(options.template);
+            const templateContent = vault.readNote(templatePath);
+            if (templateContent) {
+              const parsed = NoteParser.parse(templateContent);
+              frontmatter = parsed.frontmatter;
+              if (parsed.tags.length > 0) {
+                tags.push(...parsed.tags.map(t => t.name));
+              }
             }
           }
-        }
 
-        // Determine title
-        const title = options.title || new Date().toISOString();
+          const title = options.title || new Date().toISOString();
 
-        // Determine path
-        if (options.path) {
-          notePath = options.path.endsWith('.md') ? options.path : `${options.path}.md`;
-        } else {
-          // Default: use title as filename
-          const safeTitle = title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-          notePath = `${safeTitle}.md`;
-        }
+          if (options.path) {
+            notePath = options.path.endsWith('.md') ? options.path : `${options.path}.md`;
+          } else {
+            const safeTitle = title.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            notePath = `${safeTitle}.md`;
+          }
 
-        // Generate content
-        frontmatter.tags = [...new Set(tags)]; // Remove duplicates
-        noteContent = NoteParser.generateNoteContent(title, body, frontmatter);
+          frontmatter.tags = [...new Set(tags)];
+          noteContent = NoteParser.generateNoteContent(title, body, frontmatter);
 
-        // Write note
-        vault.writeNote(notePath, noteContent);
+          vault.writeNote(notePath, noteContent);
 
-        // Sync single note to database (optimized - no full vault scan)
-        const noteFileContent = vault.readNote(notePath);
-        if (noteFileContent) {
-          const hash = NoteParser.computeHash(noteFileContent);
-          const note = await vault.createNoteFromFile(notePath, noteFileContent, hash);
-          vault.upsertNote(note);
-        }
+          const noteFileContent = vault.readNote(notePath);
+          if (noteFileContent) {
+            const hash = NoteParser.computeHash(noteFileContent);
+            const note = await vault.createNoteFromFile(notePath, noteFileContent, hash);
+            vault.upsertNote(note);
+          }
 
-        const file = vault.getFileByPath(notePath);
+          const file = vault.getFileByPath(notePath);
 
-        console.log('✅ Note captured!');
-        console.log('Path:', notePath);
-        console.log(JSON.stringify({
-          success: true,
-          path: notePath,
-          basename: file?.basename ?? notePath.replace(/\.md$/, ''),
-          title,
-          tags
-        }, null, 2));
-
-        vault.close();
+          console.log('✅ Note captured!');
+          console.log('Path:', notePath);
+          console.log(JSON.stringify({
+            success: true,
+            path: notePath,
+            basename: file?.basename ?? notePath.replace(/\.md$/, ''),
+            title,
+            tags
+          }, null, 2));
+        });
       } catch (error) {
         console.error('❌ Failed to capture note:', error instanceof Error ? error.message : String(error));
         process.exit(1);

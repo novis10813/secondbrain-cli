@@ -1,4 +1,5 @@
 import { Command } from 'commander';
+import { getConfigOrExit } from '../utils/vault-resolve.js';
 import { ConfigManager } from '../utils/config.js';
 
 export function createConfigCommand(): Command {
@@ -10,15 +11,7 @@ export function createConfigCommand(): Command {
         .argument('<key>', 'Configuration key')
         .action((key) => {
           try {
-            const vaultPath = ConfigManager.findVaultPath();
-            if (!vaultPath) {
-              console.error('❌ Not in a SecondBrain vault. Run `sb init` first.');
-              process.exit(1);
-            }
-
-            const configManager = new ConfigManager(vaultPath);
-            const config = configManager.getConfig();
-
+            const config = getConfigOrExit();
             if (key in config) {
               console.log((config as unknown as Record<string, unknown>)[key]);
             } else {
@@ -39,21 +32,14 @@ export function createConfigCommand(): Command {
         .argument('<value>', 'Configuration value')
         .action((key, value) => {
           try {
-            const vaultPath = ConfigManager.findVaultPath();
-            if (!vaultPath) {
-              console.error('❌ Not in a SecondBrain vault. Run `sb init` first.');
-              process.exit(1);
-            }
-
-            const configManager = new ConfigManager(vaultPath);
+            const config = getConfigOrExit();
+            const configManager = new ConfigManager(config.vaultPath);
             const validKeys = ['dailyNotesFolder', 'templatesFolder'];
-
             if (!validKeys.includes(key)) {
               console.error(`❌ Cannot set config key: ${key}`);
               console.log(`Editable keys: ${validKeys.join(', ')}`);
               process.exit(1);
             }
-
             configManager.updateConfig({ [key]: value });
             console.log(`✅ Set ${key} = ${value}`);
           } catch (error) {
@@ -67,15 +53,7 @@ export function createConfigCommand(): Command {
         .description('List all configuration')
         .action(() => {
           try {
-            const vaultPath = ConfigManager.findVaultPath();
-            if (!vaultPath) {
-              console.error('❌ Not in a SecondBrain vault. Run `sb init` first.');
-              process.exit(1);
-            }
-
-            const configManager = new ConfigManager(vaultPath);
-            const config = configManager.getConfig();
-
+            const config = getConfigOrExit();
             console.log('Configuration:\n');
             Object.entries(config).forEach(([key, value]) => {
               console.log(`${key}: ${value}`);
