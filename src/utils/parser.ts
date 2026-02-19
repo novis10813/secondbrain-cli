@@ -2,18 +2,20 @@ import { createHash } from 'crypto';
 import * as yaml from 'yaml';
 
 import type {
-	Pos,
-	HeadingCache,
-	ListItemCache,
-	ContentMetadata,
-	LinkCache,
-	TagCache,
-	EmbedCache,
-	BlockCache,
-	FrontMatterCache,
-	FootnoteCache,
-	FootnoteRefCache,
-	SectionCache
+  HeadingRef,
+  EmbedRef,
+  Pos,
+  HeadingCache,
+  ListItemCache,
+  ContentMetadata,
+  LinkCache,
+  TagCache,
+  EmbedCache,
+  BlockCache,
+  FrontMatterCache,
+  FootnoteCache,
+  FootnoteRefCache,
+  SectionCache
 } from '../types/index.js';
 import { rangeToPos } from './position.js';
 
@@ -36,13 +38,7 @@ export interface TagRef {
   position: Pos;
 }
 
-export interface HeadingRef {
-  level: number;
-  text: string;
-  line: number;
-  column: number;
-  position: Pos;
-}
+// HeadingRef imported from types/index.ts
 
 export interface HeadingStructure {
   level: number;
@@ -60,12 +56,7 @@ export interface BlockRef {
   position: Pos;
 }
 
-export interface EmbedRef {
-  target: string;
-  line: number;
-  column: number;
-  position: Pos;
-}
+// EmbedRef imported from types/index.ts
 
 export interface ListItemRef {
   level: number;
@@ -278,16 +269,14 @@ export class NoteParser {
       if (Array.isArray(frontmatter.tags)) {
         for (const tag of frontmatter.tags) {
           const name = String(tag).replace(/^#/, '');
-          if (name && !seen.has(name)) {
-            seen.add(name);
+          if (name) {
             result.push({ name, ...fmLine, position: fmPosition });
           }
         }
       } else if (typeof frontmatter.tags === 'string') {
         for (const tag of frontmatter.tags.split(/[,\s]+/)) {
           const name = tag.replace(/^#/, '');
-          if (name && !seen.has(name)) {
-            seen.add(name);
+          if (name) {
             result.push({ name, ...fmLine, position: fmPosition });
           }
         }
@@ -303,8 +292,6 @@ export class NoteParser {
       if (atLineStart && body.slice(match.index).match(/^#{1,6}\s+/)) continue; // heading
       if (!atLineStart && !/[\s]/.test(charBefore)) continue; // require space/newline before #tag
       const name = match[1];
-      if (seen.has(name)) continue;
-      seen.add(name);
       const pos = this.indexToPosition(body, match.index);
       const position = rangeToPos(
         content,
@@ -325,16 +312,12 @@ export class NoteParser {
     frontmatterPosition?: Pos
   ): LinkRef[] {
     const result: LinkRef[] = [];
-    const seen = new Set<string>();
     const fmPos = { line: 1, column: 1 };
     const fmPosition =
       frontmatterPosition ?? rangeToPos(content, 0, Math.min(1, content.length));
 
     this.extractLinksFromObject(frontmatter, (target) => {
-      if (!seen.has(target)) {
-        seen.add(target);
-        result.push({ target, ...fmPos, position: fmPosition });
-      }
+      result.push({ target, ...fmPos, position: fmPosition });
     });
 
     // Obsidian links [[x]] or [[x|label]]; exclude embeds ![[x]]
@@ -342,8 +325,6 @@ export class NoteParser {
     let match;
     while ((match = linkRegex.exec(body)) !== null) {
       const target = match[1].trim();
-      if (seen.has(target)) continue;
-      seen.add(target);
       const pos = this.indexToPosition(body, match.index);
       const position = rangeToPos(
         content,
@@ -363,15 +344,12 @@ export class NoteParser {
     bodyStartIndex: number
   ): EmbedRef[] {
     const result: EmbedRef[] = [];
-    const seen = new Set<string>();
     // Obsidian embeds: ![[path]] or ![[path|display]]; skip inside code blocks
     const embedRegex = /!\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
     let match;
     while ((match = embedRegex.exec(body)) !== null) {
       if (this.isInCodeBlock(match.index, codeRanges)) continue;
       const target = match[1].trim();
-      if (seen.has(target)) continue;
-      seen.add(target);
       const pos = this.indexToPosition(body, match.index);
       const position = rangeToPos(
         content,
@@ -643,143 +621,143 @@ export class NoteParser {
     return sections;
   }
 
-	/**
-	 * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
-	 * Preserves task status and position information.
-	 */
-	static listItemsToCache(listItems: ListItemRef[]): ListItemCache[] {
-		return listItems.map(li => ({
-			task: li.task,
-			position: li.position
-		}));
-	}
+  /**
+   * Convert ListItemRef[] to ListItemCache[] for ContentMetadata.
+   * Preserves task status and position information.
+   */
+  static listItemsToCache(listItems: ListItemRef[]): ListItemCache[] {
+    return listItems.map(li => ({
+      task: li.task,
+      position: li.position
+    }));
+  }
 
-	/**
-	 * Convert ParsedNote to ContentMetadata (Obsidian CachedMetadata format).
-	 * Separates content-derived metadata from file system information.
-	 */
-	static parsedToContentMetadata(parsed: ParsedNote, originalContent?: string): ContentMetadata {
-		const metadata: ContentMetadata = {};
+  /**
+   * Convert ParsedNote to ContentMetadata (Obsidian CachedMetadata format).
+   * Separates content-derived metadata from file system information.
+   */
+  static parsedToContentMetadata(parsed: ParsedNote, originalContent?: string): ContentMetadata {
+    const metadata: ContentMetadata = {};
 
-		// Convert links
-		if (parsed.links.length > 0) {
-			metadata.links = parsed.links.map((link): LinkCache => {
-				// Try to extract display text from original content if available
-				let displayText: string | undefined;
-				let original = `[[${link.target}]]`;
-				if (originalContent) {
-					const startOffset = link.position.start.offset;
-					const endOffset = link.position.end.offset;
-					const linkText = originalContent.slice(startOffset, endOffset);
-					const match = linkText.match(/\[\[([^\]]+)\]\]/);
-					if (match) {
-						original = match[0];
-						const parts = match[1].split('|');
-						if (parts.length > 1) {
-							displayText = parts.slice(1).join('|');
-						}
-					}
-				}
-				return {
-					link: link.target,
-					original,
-					displayText,
-					position: link.position
-				};
-			});
-		}
+    // Convert links
+    if (parsed.links.length > 0) {
+      metadata.links = parsed.links.map((link): LinkCache => {
+        // Try to extract display text from original content if available
+        let displayText: string | undefined;
+        let original = `[[${link.target}]]`;
+        if (originalContent) {
+          const startOffset = link.position.start.offset;
+          const endOffset = link.position.end.offset;
+          const linkText = originalContent.slice(startOffset, endOffset);
+          const match = linkText.match(/\[\[([^\]]+)\]\]/);
+          if (match) {
+            original = match[0];
+            const parts = match[1].split('|');
+            if (parts.length > 1) {
+              displayText = parts.slice(1).join('|');
+            }
+          }
+        }
+        return {
+          link: link.target,
+          original,
+          displayText,
+          position: link.position
+        };
+      });
+    }
 
-		// Convert embeds
-		if (parsed.embeds.length > 0) {
-			metadata.embeds = parsed.embeds.map((embed): EmbedCache => {
-				// Try to extract display text from original content if available
-				let displayText: string | undefined;
-				let original = `![[${embed.target}]]`;
-				if (originalContent) {
-					const startOffset = embed.position.start.offset;
-					const endOffset = embed.position.end.offset;
-					const embedText = originalContent.slice(startOffset, endOffset);
-					const match = embedText.match(/!\[\[([^\]]+)\]\]/);
-					if (match) {
-						original = match[0];
-						const parts = match[1].split('|');
-						if (parts.length > 1) {
-							displayText = parts.slice(1).join('|');
-						}
-					}
-				}
-				return {
-					link: embed.target,
-					original,
-					displayText,
-					position: embed.position
-				};
-			});
-		}
+    // Convert embeds
+    if (parsed.embeds.length > 0) {
+      metadata.embeds = parsed.embeds.map((embed): EmbedCache => {
+        // Try to extract display text from original content if available
+        let displayText: string | undefined;
+        let original = `![[${embed.target}]]`;
+        if (originalContent) {
+          const startOffset = embed.position.start.offset;
+          const endOffset = embed.position.end.offset;
+          const embedText = originalContent.slice(startOffset, endOffset);
+          const match = embedText.match(/!\[\[([^\]]+)\]\]/);
+          if (match) {
+            original = match[0];
+            const parts = match[1].split('|');
+            if (parts.length > 1) {
+              displayText = parts.slice(1).join('|');
+            }
+          }
+        }
+        return {
+          link: embed.target,
+          original,
+          displayText,
+          position: embed.position
+        };
+      });
+    }
 
-		// Convert tags
-		if (parsed.tags.length > 0) {
-			metadata.tags = parsed.tags.map(
-				(tag): TagCache => ({
-					tag: tag.name,
-					position: tag.position
-				})
-			);
-		}
+    // Convert tags
+    if (parsed.tags.length > 0) {
+      metadata.tags = parsed.tags.map(
+        (tag): TagCache => ({
+          tag: tag.name,
+          position: tag.position
+        })
+      );
+    }
 
-		// Convert headings
-		if (parsed.headings.length > 0) {
-			metadata.headings = this.headingsToCache(parsed.headings);
-		}
+    // Convert headings
+    if (parsed.headings.length > 0) {
+      metadata.headings = this.headingsToCache(parsed.headings);
+    }
 
-		// Convert blocks
-		if (parsed.blockRefs.length > 0) {
-			metadata.blocks = parsed.blockRefs.map(
-				(block): BlockCache => ({
-					id: block.blockId,
-					position: block.position
-				})
-			);
-		}
+    // Convert blocks
+    if (parsed.blockRefs.length > 0) {
+      metadata.blocks = parsed.blockRefs.map(
+        (block): BlockCache => ({
+          id: block.blockId,
+          position: block.position
+        })
+      );
+    }
 
-		// Convert frontmatter position
-		if (parsed.frontmatterPosition) {
-			metadata.frontmatter = {
-				position: parsed.frontmatterPosition
-			};
-		}
+    // Convert frontmatter position
+    if (parsed.frontmatterPosition) {
+      metadata.frontmatter = {
+        position: parsed.frontmatterPosition
+      };
+    }
 
-		// Convert list items
-		if (parsed.listItems.length > 0) {
-			metadata.listItems = this.listItemsToCache(parsed.listItems);
-		}
+    // Convert list items
+    if (parsed.listItems.length > 0) {
+      metadata.listItems = this.listItemsToCache(parsed.listItems);
+    }
 
-		// Convert footnotes (definitions)
-		if (parsed.footnotes.length > 0) {
-			metadata.footnotes = parsed.footnotes.map(
-				(fn): FootnoteCache => ({
-					id: fn.id,
-					content: fn.content,
-					position: fn.position
-				})
-			);
-		}
+    // Convert footnotes (definitions)
+    if (parsed.footnotes.length > 0) {
+      metadata.footnotes = parsed.footnotes.map(
+        (fn): FootnoteCache => ({
+          id: fn.id,
+          content: fn.content,
+          position: fn.position
+        })
+      );
+    }
 
-		// Convert footnote refs
-		if (parsed.footnoteRefs.length > 0) {
-			metadata.footnoteRefs = parsed.footnoteRefs.map(
-				(ref): FootnoteRefCache => ({
-					id: ref.id,
-					position: ref.position
-				})
-			);
-		}
+    // Convert footnote refs
+    if (parsed.footnoteRefs.length > 0) {
+      metadata.footnoteRefs = parsed.footnoteRefs.map(
+        (ref): FootnoteRefCache => ({
+          id: ref.id,
+          position: ref.position
+        })
+      );
+    }
 
-		// Sections (from headings + frontmatter); require full content for correct positions
-		if (originalContent != null) {
-			metadata.sections = this.buildSections(parsed, originalContent);
-		}
+    // Sections (from headings + frontmatter); require full content for correct positions
+    if (originalContent != null) {
+      metadata.sections = this.buildSections(parsed, originalContent);
+    }
 
-		return metadata;
-	}
+    return metadata;
+  }
 }

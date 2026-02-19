@@ -87,6 +87,7 @@ export class DatabaseManager {
         source_path TEXT NOT NULL,
         target_path TEXT,
         target_id TEXT,
+        link_target TEXT,        -- Original link target (e.g. "Note Name")
         original TEXT NOT NULL,
         display_text TEXT,
         start_line INTEGER NOT NULL,
@@ -187,6 +188,7 @@ export class DatabaseManager {
     // Create indexes for new tables
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS idx_files_content_hash ON files(content_hash);
+      CREATE INDEX IF NOT EXISTS idx_files_basename ON files(basename COLLATE NOCASE);
       CREATE INDEX IF NOT EXISTS idx_links_pos_source ON links_with_positions(source_path);
       CREATE INDEX IF NOT EXISTS idx_links_pos_target ON links_with_positions(target_path);
       CREATE INDEX IF NOT EXISTS idx_tags_pos_file ON tags_with_positions(file_path);
@@ -215,7 +217,7 @@ export class DatabaseManager {
   }
 
   // FileInfo operations
-  upsertFile(file: FileInfo, contentHash: string): void {
+  upsertFile(file: FileInfo, contentHash?: string): void {
     const stmt = this.db.prepare(`
       INSERT INTO files (path, name, basename, extension, parent, ctime, mtime, size, content_hash)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -235,16 +237,21 @@ export class DatabaseManager {
       file.name,
       file.basename,
       file.extension,
-      file.parent,
+      file.parent || null,
       file.stat.ctime,
       file.stat.mtime,
       file.stat.size,
-      contentHash
+      contentHash || file.content_hash
     );
   }
 
   getFileByPath(path: string): FileInfo | null {
     const row = this.db.prepare('SELECT * FROM files WHERE path = ?').get(path) as FilesRow | undefined;
+    return row ? this.rowToFileInfo(row) : null;
+  }
+
+  getFileByBasename(basename: string): FileInfo | null {
+    const row = this.db.prepare('SELECT * FROM files WHERE basename = ? COLLATE NOCASE LIMIT 1').get(basename) as FilesRow | undefined;
     return row ? this.rowToFileInfo(row) : null;
   }
 
@@ -264,18 +271,18 @@ export class DatabaseManager {
     return row?.content_hash ?? null;
   }
 
-	/**
-	 * Update link target in links_with_positions table.
-	 * Finds link by source_path and start_offset, then updates target_path and target_id.
-	 */
-	updateLinkTarget(sourcePath: string, startOffset: number, targetPath: string | null, targetId: string | null): void {
-		const stmt = this.db.prepare(`
+  /**
+   * Update link target in links_with_positions table.
+   * Finds link by source_path and start_offset, then updates target_path and target_id.
+   */
+  updateLinkTarget(sourcePath: string, startOffset: number, targetPath: string | null, targetId: string | null): void {
+    const stmt = this.db.prepare(`
 			UPDATE links_with_positions
 			SET target_path = ?, target_id = ?
 			WHERE source_path = ? AND start_offset = ?
 		`);
-		stmt.run(targetPath, targetId, sourcePath, startOffset);
-	}
+    stmt.run(targetPath, targetId, sourcePath, startOffset);
+  }
 
   /** Get files that link to the given file path (new structure). */
   getBacklinksByPath(filePath: string): FileInfo[] {
@@ -309,34 +316,34 @@ export class DatabaseManager {
     return rows.map((row) => this.rowToFileInfo(row));
   }
 
-	/**
-	 * Get start position of a heading in a file. Matches by exact heading text or Obsidian-style slug.
-	 * @returns { line, col } (1-based) or null
-	 */
-	getHeadingPosition(filePath: string, headingFragment: string): { line: number; col: number } | null {
-		const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-');
-		const fragmentSlug = slug(headingFragment);
-		const rows = this.db.prepare(
-			'SELECT heading, start_line, start_col FROM headings_with_positions WHERE file_path = ?'
-		).all(filePath) as { heading: string; start_line: number; start_col: number }[];
-		for (const row of rows) {
-			if (row.heading === headingFragment || slug(row.heading) === fragmentSlug) {
-				return { line: row.start_line, col: row.start_col };
-			}
-		}
-		return null;
-	}
+  /**
+   * Get start position of a heading in a file. Matches by exact heading text or Obsidian-style slug.
+   * @returns { line, col } (1-based) or null
+   */
+  getHeadingPosition(filePath: string, headingFragment: string): { line: number; col: number } | null {
+    const slug = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-');
+    const fragmentSlug = slug(headingFragment);
+    const rows = this.db.prepare(
+      'SELECT heading, start_line, start_col FROM headings_with_positions WHERE file_path = ?'
+    ).all(filePath) as { heading: string; start_line: number; start_col: number }[];
+    for (const row of rows) {
+      if (row.heading === headingFragment || slug(row.heading) === fragmentSlug) {
+        return { line: row.start_line, col: row.start_col };
+      }
+    }
+    return null;
+  }
 
-	/**
-	 * Get start position of a block (^block-id) in a file.
-	 * @returns { line, col } (1-based) or null
-	 */
-	getBlockPosition(filePath: string, blockId: string): { line: number; col: number } | null {
-		const row = this.db.prepare(
-			'SELECT start_line, start_col FROM blocks_with_positions WHERE file_path = ? AND block_id = ?'
-		).get(filePath, blockId) as { start_line: number; start_col: number } | undefined;
-		return row ? { line: row.start_line, col: row.start_col } : null;
-	}
+  /**
+   * Get start position of a block (^block-id) in a file.
+   * @returns { line, col } (1-based) or null
+   */
+  getBlockPosition(filePath: string, blockId: string): { line: number; col: number } | null {
+    const row = this.db.prepare(
+      'SELECT start_line, start_col FROM blocks_with_positions WHERE file_path = ? AND block_id = ?'
+    ).get(filePath, blockId) as { start_line: number; start_col: number } | undefined;
+    return row ? { line: row.start_line, col: row.start_col } : null;
+  }
 
   /** Get files with no incoming or outgoing links (new structure). */
   getOrphanFiles(): FileInfo[] {
@@ -352,48 +359,48 @@ export class DatabaseManager {
     return rows.map((row) => this.rowToFileInfo(row));
   }
 
-	/** Search files by path/basename, optional tags, path prefix, links-to target, heading, or mtime (new structure). */
-	searchFiles(
-		query: string,
-		tags?: string[],
-		limit: number = 20,
-		pathPrefix?: string,
-		linksToPath?: string,
-		headingQuery?: string,
-		modifiedAfter?: number,
-		modifiedBefore?: number
-	): Array<{ file: FileInfo; tags: string[] }> {
-		const like = `%${query}%`;
-		let sql = `
+  /** Search files by path/basename, optional tags, path prefix, links-to target, heading, or mtime (new structure). */
+  searchFiles(
+    query: string,
+    tags?: string[],
+    limit: number = 20,
+    pathPrefix?: string,
+    linksToPath?: string,
+    headingQuery?: string,
+    modifiedAfter?: number,
+    modifiedBefore?: number
+  ): Array<{ file: FileInfo; tags: string[] }> {
+    const like = `%${query}%`;
+    let sql = `
 			SELECT f.*, (SELECT group_concat(DISTINCT tag) FROM tags_with_positions WHERE file_path = f.path) AS tags_str
 			FROM files f
 			WHERE (f.path LIKE ? OR f.basename LIKE ?)
 		`;
-		const params: (string | number)[] = [like, like];
-		if (pathPrefix !== undefined && pathPrefix !== '') {
-			sql += ` AND (f.path LIKE ? OR f.parent = ?)`;
-			params.push(`${pathPrefix}%`, pathPrefix);
-		}
-		if (tags && tags.length > 0) {
-			sql += ` AND f.path IN (SELECT file_path FROM tags_with_positions WHERE tag IN (${tags.map(() => '?').join(',')}))`;
-			params.push(...tags);
-		}
-		if (linksToPath !== undefined && linksToPath !== '') {
-			sql += ` AND f.path IN (SELECT source_path FROM links_with_positions WHERE target_path = ?)`;
-			params.push(linksToPath);
-		}
-		if (headingQuery !== undefined && headingQuery !== '') {
-			sql += ` AND f.path IN (SELECT file_path FROM headings_with_positions WHERE heading LIKE ?)`;
-			params.push(`%${headingQuery}%`);
-		}
-		if (modifiedAfter !== undefined && Number.isFinite(modifiedAfter)) {
-			sql += ` AND f.mtime >= ?`;
-			params.push(modifiedAfter);
-		}
-		if (modifiedBefore !== undefined && Number.isFinite(modifiedBefore)) {
-			sql += ` AND f.mtime <= ?`;
-			params.push(modifiedBefore);
-		}
+    const params: (string | number)[] = [like, like];
+    if (pathPrefix !== undefined && pathPrefix !== '') {
+      sql += ` AND (f.path LIKE ? OR f.parent = ?)`;
+      params.push(`${pathPrefix}%`, pathPrefix);
+    }
+    if (tags && tags.length > 0) {
+      sql += ` AND f.path IN (SELECT file_path FROM tags_with_positions WHERE tag IN (${tags.map(() => '?').join(',')}))`;
+      params.push(...tags);
+    }
+    if (linksToPath !== undefined && linksToPath !== '') {
+      sql += ` AND f.path IN (SELECT source_path FROM links_with_positions WHERE target_path = ?)`;
+      params.push(linksToPath);
+    }
+    if (headingQuery !== undefined && headingQuery !== '') {
+      sql += ` AND f.path IN (SELECT file_path FROM headings_with_positions WHERE heading LIKE ?)`;
+      params.push(`%${headingQuery}%`);
+    }
+    if (modifiedAfter !== undefined && Number.isFinite(modifiedAfter)) {
+      sql += ` AND f.mtime >= ?`;
+      params.push(modifiedAfter);
+    }
+    if (modifiedBefore !== undefined && Number.isFinite(modifiedBefore)) {
+      sql += ` AND f.mtime <= ?`;
+      params.push(modifiedBefore);
+    }
     sql += ` ORDER BY f.mtime DESC LIMIT ?`;
     params.push(limit);
     const rows = this.db.prepare(sql).all(...params) as (FilesRow & { tags_str: string | null })[];
@@ -404,8 +411,16 @@ export class DatabaseManager {
   }
 
   // ContentMetadata operations
+  // ContentMetadata operations
   upsertContentMetadata(filePath: string, metadata: ContentMetadata, contentHash: string): void {
-    // Prepare statements outside transaction
+    const transaction = this.db.transaction(() => {
+      this.doUpsertContentMetadata(filePath, metadata, contentHash);
+    });
+    transaction();
+  }
+
+  private doUpsertContentMetadata(filePath: string, metadata: ContentMetadata, contentHash: string): void {
+    // Prepare statements inside (potentially) outer transaction
     const metadataStmt = this.db.prepare(`
       INSERT INTO content_metadata (
         file_path, content_hash,
@@ -430,188 +445,184 @@ export class DatabaseManager {
     const deleteEmbedsStmt = this.db.prepare('DELETE FROM embeds_with_positions WHERE file_path = ?');
     const deleteSectionsStmt = this.db.prepare('DELETE FROM sections_with_positions WHERE file_path = ?');
 
-    // Use transaction for atomicity
-    const transaction = this.db.transaction(() => {
-      const frontmatter = metadata.frontmatter;
-      metadataStmt.run(
-        filePath,
-        contentHash,
-        frontmatter?.position.start.line ?? null,
-        frontmatter?.position.start.col ?? null,
-        frontmatter?.position.start.offset ?? null,
-        frontmatter?.position.end.line ?? null,
-        frontmatter?.position.end.col ?? null,
-        frontmatter?.position.end.offset ?? null
-      );
+    const frontmatter = metadata.frontmatter;
+    metadataStmt.run(
+      filePath,
+      contentHash,
+      frontmatter?.position.start.line ?? null,
+      frontmatter?.position.start.col ?? null,
+      frontmatter?.position.start.offset ?? null,
+      frontmatter?.position.end.line ?? null,
+      frontmatter?.position.end.col ?? null,
+      frontmatter?.position.end.offset ?? null
+    );
 
-      // Delete existing metadata items
-      deleteLinksStmt.run(filePath);
-      deleteTagsStmt.run(filePath);
-      deleteHeadingsStmt.run(filePath);
-      deleteBlocksStmt.run(filePath);
-      deleteEmbedsStmt.run(filePath);
-      deleteSectionsStmt.run(filePath);
+    // Delete existing metadata items
+    deleteLinksStmt.run(filePath);
+    deleteTagsStmt.run(filePath);
+    deleteHeadingsStmt.run(filePath);
+    deleteBlocksStmt.run(filePath);
+    deleteEmbedsStmt.run(filePath);
+    deleteSectionsStmt.run(filePath);
 
-      // Prepare INSERT statements inside transaction
-      const linkStmt = this.db.prepare(`
-        INSERT INTO links_with_positions (
-          source_path, target_path, target_id, original, display_text,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    // Prepare INSERT statements
+    const linkStmt = this.db.prepare(`
+      INSERT INTO links_with_positions (
+        source_path, target_path, target_id, link_target, original, display_text,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      const tagStmt = this.db.prepare(`
-        INSERT INTO tags_with_positions (
-          file_path, tag,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    const tagStmt = this.db.prepare(`
+      INSERT INTO tags_with_positions (
+        file_path, tag,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      const headingStmt = this.db.prepare(`
-        INSERT INTO headings_with_positions (
-          file_path, heading, level,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    const headingStmt = this.db.prepare(`
+      INSERT INTO headings_with_positions (
+        file_path, heading, level,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      const blockStmt = this.db.prepare(`
-        INSERT INTO blocks_with_positions (
-          file_path, block_id,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    const blockStmt = this.db.prepare(`
+      INSERT INTO blocks_with_positions (
+        file_path, block_id,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      const embedStmt = this.db.prepare(`
-        INSERT INTO embeds_with_positions (
-          file_path, target_path, original, display_text,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    const embedStmt = this.db.prepare(`
+      INSERT INTO embeds_with_positions (
+        file_path, target_path, original, display_text,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      const sectionStmt = this.db.prepare(`
-        INSERT INTO sections_with_positions (
-          file_path, section_id, type,
-          start_line, start_col, start_offset,
-          end_line, end_col, end_offset
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `);
+    const sectionStmt = this.db.prepare(`
+      INSERT INTO sections_with_positions (
+        file_path, section_id, type,
+        start_line, start_col, start_offset,
+        end_line, end_col, end_offset
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
 
-      // Insert links
-      if (metadata.links && metadata.links.length > 0) {
-        for (const link of metadata.links) {
-          linkStmt.run(
-            filePath,
-            link.link,
-            null, // target_id will be resolved later
-            link.original,
-            link.displayText ?? null,
-            link.position.start.line,
-            link.position.start.col,
-            link.position.start.offset,
-            link.position.end.line,
-            link.position.end.col,
-            link.position.end.offset
-          );
-        }
+    // Insert links
+    if (metadata.links && metadata.links.length > 0) {
+      for (const link of metadata.links) {
+        linkStmt.run(
+          filePath,
+          link.link,
+          null,
+          link.link,
+          link.original,
+          link.displayText ?? null,
+          link.position.start.line,
+          link.position.start.col,
+          link.position.start.offset,
+          link.position.end.line,
+          link.position.end.col,
+          link.position.end.offset
+        );
       }
+    }
 
-      // Insert tags
-      if (metadata.tags && metadata.tags.length > 0) {
-        for (const tag of metadata.tags) {
-          tagStmt.run(
-            filePath,
-            tag.tag,
-            tag.position.start.line,
-            tag.position.start.col,
-            tag.position.start.offset,
-            tag.position.end.line,
-            tag.position.end.col,
-            tag.position.end.offset
-          );
-        }
+    // Insert tags
+    if (metadata.tags && metadata.tags.length > 0) {
+      for (const tag of metadata.tags) {
+        tagStmt.run(
+          filePath,
+          tag.tag,
+          tag.position.start.line,
+          tag.position.start.col,
+          tag.position.start.offset,
+          tag.position.end.line,
+          tag.position.end.col,
+          tag.position.end.offset
+        );
       }
+    }
 
-      // Insert headings
-      if (metadata.headings && metadata.headings.length > 0) {
-        for (const heading of metadata.headings) {
-          headingStmt.run(
-            filePath,
-            heading.heading,
-            heading.level,
-            heading.position.start.line,
-            heading.position.start.col,
-            heading.position.start.offset,
-            heading.position.end.line,
-            heading.position.end.col,
-            heading.position.end.offset
-          );
-        }
+    // Insert headings
+    if (metadata.headings && metadata.headings.length > 0) {
+      for (const heading of metadata.headings) {
+        headingStmt.run(
+          filePath,
+          heading.heading,
+          heading.level,
+          heading.position.start.line,
+          heading.position.start.col,
+          heading.position.start.offset,
+          heading.position.end.line,
+          heading.position.end.col,
+          heading.position.end.offset
+        );
       }
+    }
 
-      // Insert blocks
-      if (metadata.blocks && metadata.blocks.length > 0) {
-        for (const block of metadata.blocks) {
-          blockStmt.run(
-            filePath,
-            block.id,
-            block.position.start.line,
-            block.position.start.col,
-            block.position.start.offset,
-            block.position.end.line,
-            block.position.end.col,
-            block.position.end.offset
-          );
-        }
+    // Insert blocks
+    if (metadata.blocks && metadata.blocks.length > 0) {
+      for (const block of metadata.blocks) {
+        blockStmt.run(
+          filePath,
+          block.id,
+          block.position.start.line,
+          block.position.start.col,
+          block.position.start.offset,
+          block.position.end.line,
+          block.position.end.col,
+          block.position.end.offset
+        );
       }
+    }
 
-      // Insert embeds
-      if (metadata.embeds && metadata.embeds.length > 0) {
-        for (const embed of metadata.embeds) {
-          embedStmt.run(
-            filePath,
-            embed.link,
-            embed.original,
-            embed.displayText ?? null,
-            embed.position.start.line,
-            embed.position.start.col,
-            embed.position.start.offset,
-            embed.position.end.line,
-            embed.position.end.col,
-            embed.position.end.offset
-          );
-        }
+    // Insert embeds
+    if (metadata.embeds && metadata.embeds.length > 0) {
+      for (const embed of metadata.embeds) {
+        embedStmt.run(
+          filePath,
+          embed.link,
+          embed.original,
+          embed.displayText ?? null,
+          embed.position.start.line,
+          embed.position.start.col,
+          embed.position.start.offset,
+          embed.position.end.line,
+          embed.position.end.col,
+          embed.position.end.offset
+        );
       }
+    }
 
-      // Insert sections
-      if (metadata.sections && metadata.sections.length > 0) {
-        for (const section of metadata.sections) {
-          sectionStmt.run(
-            filePath,
-            section.id,
-            section.type,
-            section.position.start.line,
-            section.position.start.col,
-            section.position.start.offset,
-            section.position.end.line,
-            section.position.end.col,
-            section.position.end.offset
-          );
-        }
+    // Insert sections
+    if (metadata.sections && metadata.sections.length > 0) {
+      for (const section of metadata.sections) {
+        sectionStmt.run(
+          filePath,
+          section.id,
+          section.type,
+          section.position.start.line,
+          section.position.start.col,
+          section.position.start.offset,
+          section.position.end.line,
+          section.position.end.col,
+          section.position.end.offset
+        );
       }
-    });
-
-    transaction();
+    }
   }
 
   getContentMetadata(filePath: string): ContentMetadata | null {
@@ -646,7 +657,7 @@ export class DatabaseManager {
     const linkRows = this.db.prepare('SELECT * FROM links_with_positions WHERE source_path = ?').all(filePath) as any[];
     if (linkRows.length > 0) {
       result.links = linkRows.map(row => ({
-        link: row.target_path || row.target_id || '',
+        link: row.link_target || row.target_path || row.target_id || '',
         original: row.original,
         displayText: row.display_text ?? undefined,
         position: {
@@ -819,11 +830,13 @@ export class DatabaseManager {
   upsertContentMetadataBatch(items: Array<{ filePath: string; metadata: ContentMetadata; contentHash: string }>): void {
     if (items.length === 0) return;
 
-    // Note: upsertContentMetadata already uses a transaction internally,
-    // so we don't need to wrap it again
-    for (const { filePath, metadata, contentHash } of items) {
-      this.upsertContentMetadata(filePath, metadata, contentHash);
-    }
+    const transaction = this.db.transaction(() => {
+      for (const { filePath, metadata, contentHash } of items) {
+        this.doUpsertContentMetadata(filePath, metadata, contentHash);
+      }
+    });
+
+    transaction();
   }
 
 

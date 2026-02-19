@@ -140,4 +140,53 @@ describe('DatabaseManager Batch Operations', () => {
 
     db.close();
   }, 15000);
+
+  it('should be atomic - rollback all if one fails in batch', () => {
+    const db = new DatabaseManager(config);
+    const files = [
+      { file: createTestFile('test/note1.md'), contentHash: 'hash1' },
+      { file: createTestFile('test/note2.md'), contentHash: 'hash2' }
+    ];
+    db.upsertFilesBatch(files);
+
+    const metadataItems = [
+      {
+        filePath: 'test/note1.md',
+        metadata: {
+          links: [{
+            link: 'a',
+            original: '[[]]',
+            position: { start: { line: 1, col: 1, offset: 0 }, end: { line: 1, col: 1, offset: 0 } }
+          }]
+        } as ContentMetadata,
+        contentHash: 'hash1'
+      },
+      {
+        filePath: 'non-existent.md', // This will fail because of FOREIGN KEY constraint
+        metadata: {
+          links: [{
+            link: 'b',
+            original: '[[]]',
+            position: { start: { line: 1, col: 1, offset: 0 }, end: { line: 1, col: 1, offset: 0 } }
+          }]
+        } as ContentMetadata,
+        contentHash: 'hash2'
+      }
+    ];
+
+    // Red light: Expect it to throw AND rollback note1
+    try {
+      db.upsertContentMetadataBatch(metadataItems);
+    } catch (e) {
+      // Expected to fail on the second item
+    }
+
+    const metadata1 = db.getContentMetadata('test/note1.md');
+    // IF it's atomic, metadata1.links should be empty (because it was deleted at search but rolled back? 
+    // Actually upsertContentMetadata deletes THEN inserts. If it rolls back, it stays as it was.)
+    // Wait, initially it had NO links. After failed batch, it should still have NO links.
+    expect(metadata1?.links || []).toHaveLength(0);
+
+    db.close();
+  });
 });

@@ -63,6 +63,18 @@ Inline \`#code-tag\` ignored.`;
       expect(parsed.tags[0].name).toBe('tag');
     });
 
+    it('應該保留所有出現的 Obsidian 連結，即使 target 相同', () => {
+      const content = `[[Note]] and [[Note]] and [[Note|Display]]`;
+      const parsed = NoteParser.parse(content);
+
+      // RED LIGHT: Currently NoteParser.extractLinks uses a Set to deduplicate by target
+      // So it will only return 1 link instead of 3.
+      expect(parsed.links).toHaveLength(3);
+      expect(parsed.links[0].target).toBe('Note');
+      expect(parsed.links[1].target).toBe('Note');
+      expect(parsed.links[2].target).toBe('Note');
+    });
+
     it('應該從內文提取 Obsidian 連結', () => {
       const content = `---
 title: Linked Note

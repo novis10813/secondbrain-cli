@@ -17,6 +17,7 @@ export interface FileInfo {
   extension: string;
   parent: string | null;
   stat: FileStats;
+  content_hash?: string;
 }
 
 
@@ -25,6 +26,7 @@ export interface EmbedRef {
   target: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 /** Obsidian-aligned position types (CachedMetadata). */
@@ -55,10 +57,10 @@ export interface ReferenceCache extends CacheItem {
 }
 
 /** Wikilink [[target]] or [[target|display]]. */
-export interface LinkCache extends ReferenceCache {}
+export interface LinkCache extends ReferenceCache { }
 
 /** Embed ![[path]] or ![[path|display]]. */
-export interface EmbedCache extends ReferenceCache {}
+export interface EmbedCache extends ReferenceCache { }
 
 /** Tag #tag (tag is the name without #). */
 export interface TagCache extends CacheItem {
@@ -126,6 +128,7 @@ export interface HeadingRef {
   text: string;
   line: number;
   column: number;
+  position: Pos;
 }
 
 

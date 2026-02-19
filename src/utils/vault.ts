@@ -17,67 +17,83 @@ export class VaultManager {
     this.db.close();
   }
 
-	// Sync entire vault
-	async sync(): Promise<{ added: number; updated: number; removed: number }> {
-		let added = 0;
-		let updated = 0;
-		let removed = 0;
+  // Sync entire vault
+  async sync(): Promise<{ added: number; updated: number; removed: number }> {
+    let added = 0;
+    let updated = 0;
+    let removed = 0;
 
-		const currentPaths = new Set<string>();
-		const markdownFiles = this.findMarkdownFiles();
-		const parsedByPath = new Map<string, ParsedNote>();
+    const currentPaths = new Set<string>();
+    const markdownFiles = this.findMarkdownFiles();
+    const parsedByPath = new Map<string, ParsedNote>();
 
-		// Pass 1: Collect all files, parse once, upsert FileInfo + ContentMetadata
-		for (const filePath of markdownFiles) {
-			const relativePath = relative(this.config.vaultPath, filePath);
-			currentPaths.add(relativePath);
+    // Pass 1: Collect all files, parse once, upsert FileInfo + ContentMetadata
+    for (const filePath of markdownFiles) {
+      const relativePath = relative(this.config.vaultPath, filePath);
+      currentPaths.add(relativePath);
 
-			const content = readFileSync(filePath, 'utf-8');
-			const parsed = NoteParser.parse(content);
-			parsedByPath.set(relativePath, parsed);
+      const content = readFileSync(filePath, 'utf-8');
+      const hash = NoteParser.computeHash(content);
 
-			const hash = NoteParser.computeHash(content);
-			const existingFile = this.db.getFileByPath(relativePath);
-			const isNew = !existingFile;
-			const existingHash = this.db.getFileContentHash(relativePath);
-			const isUpdated = existingHash !== null && existingHash !== hash;
+      const existingHash = this.db.getFileContentHash(relativePath);
 
-			if (isNew || isUpdated) {
-				const fileInfo = this.createFileInfo(relativePath, filePath);
-				const contentMetadata = NoteParser.parsedToContentMetadata(parsed, content);
+      if (existingHash === hash) {
+        // Skip parsing, load existing metadata for Pass 2 link resolution
+        const existingMetadata = this.db.getContentMetadata(relativePath);
+        if (existingMetadata) {
+          parsedByPath.set(relativePath, {
+            title: '',
+            content: '',
+            frontmatter: {},
+            tags: [],
+            links: existingMetadata.links ?? [],
+            headings: [],
+            blocks: []
+          } as any);
+          continue;
+        }
+      }
 
-				this.db.upsertFile(fileInfo, hash);
-				this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
+      const parsed = NoteParser.parse(content);
+      parsedByPath.set(relativePath, parsed);
 
-				if (isNew) {
-					added++;
-				} else {
-					updated++;
-				}
-			}
-		}
+      const existingFile = this.db.getFileByPath(relativePath);
+      const isNew = !existingFile;
 
-		// Pass 2: Resolve link targets using cached parsed data (no second read/parse)
-		for (const [relativePath, parsed] of parsedByPath) {
-			for (const link of parsed.links) {
-				const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
-				if (linkedFile) {
-					this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
-				}
-			}
-		}
+      const fileInfo = this.createFileInfo(relativePath, filePath);
+      const contentMetadata = NoteParser.parsedToContentMetadata(parsed, content);
 
-		// Remove files that no longer exist in filesystem
-		const allFiles = this.db.getAllFiles();
-		for (const file of allFiles) {
-			if (!currentPaths.has(file.path)) {
-				this.db.deleteFile(file.path);
-				removed++;
-			}
-		}
+      this.db.upsertFile(fileInfo, hash);
+      this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
 
-		return { added, updated, removed };
-	}
+      if (isNew) {
+        added++;
+      } else {
+        updated++;
+      }
+    }
+
+    // Pass 2: Resolve link targets using cached parsed data (no second read/parse)
+    for (const [relativePath, parsed] of parsedByPath) {
+      for (const link of parsed.links) {
+        const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
+        if (linkedFile) {
+          this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
+        }
+      }
+    }
+
+    // Remove files that no longer exist in filesystem
+    const allFiles = this.db.getAllFiles();
+    for (const file of allFiles) {
+      if (!currentPaths.has(file.path)) {
+        this.db.deleteFile(file.path);
+        removed++;
+      }
+    }
+
+    return { added, updated, removed };
+  }
 
   private findMarkdownFiles(): string[] {
     const files: string[] = [];
@@ -104,37 +120,37 @@ export class VaultManager {
     return files;
   }
 
-	/**
-	 * Create FileInfo from file path and stats.
-	 * Separates file system information from content parsing.
-	 */
-	private createFileInfo(relativePath: string, fullPath: string): FileInfo {
-		const stats = statSync(fullPath);
-		const ext = extname(relativePath) || '.md';
-		const name = basename(relativePath);
-		const basenameWithoutExt = basename(relativePath, ext) || basename(relativePath);
-		const parentDir = dirname(relativePath);
-		const parent = parentDir === '.' ? null : parentDir;
+  /**
+   * Create FileInfo from file path and stats.
+   * Separates file system information from content parsing.
+   */
+  private createFileInfo(relativePath: string, fullPath: string): FileInfo {
+    const stats = statSync(fullPath);
+    const ext = extname(relativePath) || '.md';
+    const name = basename(relativePath);
+    const basenameWithoutExt = basename(relativePath, ext) || basename(relativePath);
+    const parentDir = dirname(relativePath);
+    const parent = parentDir === '.' ? null : parentDir;
 
-		return {
-			path: relativePath,
-			name,
-			basename: basenameWithoutExt,
-			extension: ext.replace(/^\./, ''), // Remove leading dot
-			parent,
-			stat: {
-				ctime: stats.birthtimeMs,
-				mtime: stats.mtimeMs,
-				size: stats.size
-			}
-		};
-	}
+    return {
+      path: relativePath,
+      name,
+      basename: basenameWithoutExt,
+      extension: ext.replace(/^\./, ''), // Remove leading dot
+      parent,
+      stat: {
+        ctime: stats.birthtimeMs,
+        mtime: stats.mtimeMs,
+        size: stats.size
+      }
+    };
+  }
 
 
   // Write note to file
   writeNote(path: string, content: string): void {
     const fullPath = join(this.config.vaultPath, path);
-    
+
     // Ensure directory exists
     const dir = dirname(fullPath);
     if (!existsSync(dir)) {
@@ -234,9 +250,8 @@ export class VaultManager {
       file = this.db.getFileByPath(pathOrBasename + '.md');
       if (file) return file;
     }
-    const base = pathOrBasename.replace(/\.md$/i, '').toLowerCase();
-    const all = this.db.getAllFiles();
-    return all.find(f => f.basename.toLowerCase() === base) ?? null;
+    const base = pathOrBasename.replace(/\.md$/i, '');
+    return this.db.getFileByBasename(base);
   }
 
   /**
@@ -317,16 +332,8 @@ export class VaultManager {
 
     // Try finding by basename (filename without extension)
     // This matches Obsidian's behavior of finding files by title
-    const allFiles = this.db.getAllFiles();
-    const basenameToMatch = filePart.replace(/\.md$/, '').toLowerCase();
-    
-    for (const candidate of allFiles) {
-      if (candidate.basename.toLowerCase() === basenameToMatch) {
-        return candidate;
-      }
-    }
-
-    return null;
+    const basenameToMatch = filePart.replace(/\.md$/, '');
+    return this.db.getFileByBasename(basenameToMatch);
   }
 
   /**
