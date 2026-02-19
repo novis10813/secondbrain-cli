@@ -13,6 +13,7 @@ import { createSyncCommand } from './commands/sync.js';
 import { createStatsCommand } from './commands/stats.js';
 import { createOrphansCommand } from './commands/orphans.js';
 import { createConfigCommand } from './commands/config.js';
+import { createTemplateCommand } from './commands/template.js';
 import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 
@@ -42,6 +43,7 @@ program.addCommand(createSyncCommand());
 program.addCommand(createStatsCommand());
 program.addCommand(createOrphansCommand());
 program.addCommand(createConfigCommand());
+program.addCommand(createTemplateCommand());
 
 // Default action - show help
 if (process.argv.length === 2) {
