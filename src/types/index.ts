@@ -19,14 +19,6 @@ export interface FileInfo {
   stat: FileStats;
 }
 
-/** File system info (TFile equivalent): path, name, stat. Source: filesystem only. */
-export interface VaultFile {
-  path: string;
-  name: string;
-  extension: string;
-  createdAt: string;
-  modifiedAt: string;
-}
 
 /** Embed with position (Obsidian ![[path]]). */
 export interface EmbedRef {
@@ -136,30 +128,6 @@ export interface HeadingRef {
   column: number;
 }
 
-/** Content-derived metadata: parsed from file content. Source: parser + hash. */
-export interface NoteContent {
-  title: string;
-  content: string;
-  frontmatter: Record<string, unknown>;
-  tags: string[];
-  links: string[];
-  blockRefs: string[];
-  embeds: EmbedRef[];
-  headings: HeadingRef[];
-  hash: string;
-}
-
-/** Note = VaultFile + NoteContent + id (content hash) + backlinks (computed by DB). */
-export interface Note extends VaultFile, NoteContent {
-  id: string;
-  backlinks: string[];
-  /** Parent folder path (relative to vault). TFile-aligned. */
-  parent?: string | null;
-  /** Filename without extension. TFile-aligned. */
-  basename?: string;
-  /** File stats (ctime/mtime ms, size bytes). TFile-aligned. */
-  stat?: FileStats;
-}
 
 export interface SearchResult {
   id: string;

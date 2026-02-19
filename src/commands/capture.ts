@@ -45,12 +45,8 @@ export function createCaptureCommand(): Command {
 
           vault.writeNote(notePath, noteContent);
 
-          const noteFileContent = vault.readNote(notePath);
-          if (noteFileContent) {
-            const hash = NoteParser.computeHash(noteFileContent);
-            const note = await vault.createNoteFromFile(notePath, noteFileContent, hash);
-            vault.upsertNote(note);
-          }
+          // Index the new file by syncing (will only process changed files)
+          await vault.sync();
 
           const file = vault.getFileByPath(notePath);
 

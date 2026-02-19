@@ -19,7 +19,6 @@ const EXPECTED_COMMANDS = [
 	'stats',
 	'orphans',
 	'config',
-	'migrate',
 ];
 
 async function runCli(

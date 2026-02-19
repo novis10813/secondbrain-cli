@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs';
 import { join, relative, dirname, basename, extname } from 'path';
-import type { Note, Config, FileInfo, ContentMetadata } from '../types/index.js';
+import type { Config, FileInfo, ContentMetadata } from '../types/index.js';
 import { DatabaseManager } from './database.js';
 import { NoteParser, type ParsedNote } from './parser.js';
 
@@ -22,12 +22,6 @@ export class VaultManager {
 		let added = 0;
 		let updated = 0;
 		let removed = 0;
-
-		// Migrate any existing data from old schema first
-		const migrationResult = this.db.migrateFromOldSchema();
-		if (migrationResult.migrated > 0) {
-			added += migrationResult.migrated;
-		}
 
 		const currentPaths = new Set<string>();
 		const markdownFiles = this.findMarkdownFiles();
@@ -54,16 +48,6 @@ export class VaultManager {
 
 				this.db.upsertFile(fileInfo, hash);
 				this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
-
-				const linkIds: string[] = [];
-				const note = await this.createNoteFromFile(relativePath, content, hash, linkIds);
-				if (!isNew) {
-					const existingNote = this.db.getNoteByPath(relativePath);
-					if (existingNote) {
-						note.id = existingNote.id;
-					}
-				}
-				this.db.upsertNote(note);
 
 				if (isNew) {
 					added++;
@@ -146,47 +130,6 @@ export class VaultManager {
 		};
 	}
 
-	/**
-	 * Legacy method for backward compatibility.
-	 * Creates a Note object combining FileInfo and NoteContent.
-	 * @deprecated Use createFileInfo + NoteParser.parse + parsedToContentMetadata instead
-	 */
-	async createNoteFromFile(path: string, content: string, hash: string, links: string[] = []): Promise<Note> {
-		const parsed = NoteParser.parse(content);
-		const fullPath = join(this.config.vaultPath, path);
-		const stats = statSync(fullPath);
-
-		const ext = extname(path) || '.md';
-		const name = basename(path, ext) || basename(path);
-		const parentDir = dirname(path);
-		const parent = parentDir === '.' ? null : parentDir;
-
-		return {
-			id: hash,
-			path,
-			name,
-			extension: ext,
-			title: parsed.title,
-			content: parsed.content,
-			frontmatter: parsed.frontmatter,
-			tags: parsed.tags.map(t => t.name),
-			links: links,
-			blockRefs: parsed.blockRefs.map(b => b.blockId),
-			embeds: parsed.embeds,
-			headings: parsed.headings.map(h => ({ level: h.level, text: h.text, line: h.line, column: h.column })),
-			backlinks: [], // Will be computed by database
-			hash,
-			createdAt: stats.birthtime.toISOString(),
-			modifiedAt: stats.mtime.toISOString(),
-			parent,
-			basename: name,
-			stat: {
-				ctime: stats.birthtimeMs,
-				mtime: stats.mtimeMs,
-				size: stats.size
-			}
-		};
-	}
 
   // Write note to file
   writeNote(path: string, content: string): void {
@@ -223,34 +166,8 @@ export class VaultManager {
     return join(this.config.templatesFolder, `${templateName}.md`);
   }
 
-  // Database proxy methods (legacy note-based, used by sync/capture)
-  getNoteById(id: string): Note | null {
-    return this.db.getNoteById(id);
-  }
-
-  getNoteByPath(path: string): Note | null {
-    return this.db.getNoteByPath(path);
-  }
-
-  searchNotes(query: string, tags?: string[], limit: number = 20): Note[] {
-    return this.db.searchNotes(query, tags, limit);
-  }
-
-  getBacklinks(noteId: string): Note[] {
-    return this.db.getBacklinks(noteId);
-  }
-
-  getOrphans(): Note[] {
-    return this.db.getOrphans();
-  }
-
   getStats() {
     return this.db.getStats();
-  }
-
-  /** Migrate data from old schema (notes) to new schema (files + content_metadata). */
-  migrateFromOldSchema(): { migrated: number; skipped: number; errors: number } {
-    return this.db.migrateFromOldSchema();
   }
 
   // New structure (files + content_metadata + links_with_positions)
@@ -285,10 +202,6 @@ export class VaultManager {
     return this.db.getGraphData();
   }
 
-  // Database proxy methods
-  upsertNote(note: Note): void {
-    return this.db.upsertNote(note);
-  }
 
   // Obsidian-style API methods
 

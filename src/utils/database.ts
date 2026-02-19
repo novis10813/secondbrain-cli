@@ -1,8 +1,7 @@
 import { basename, extname, dirname } from 'path';
-import type { Note, Config, GraphData, FileInfo, ContentMetadata } from '../types/index.js';
+import type { Config, GraphData, FileInfo, ContentMetadata } from '../types/index.js';
 import { createDatabase, type SqliteDatabase } from './sqlite-adapter.js';
 import { NoteParser } from './parser.js';
-import * as yaml from 'yaml';
 
 /** Row shape from SELECT * FROM files */
 interface FilesRow {
@@ -29,6 +28,12 @@ export class DatabaseManager {
   }
 
   private initTables(): void {
+    // Drop legacy tables if they exist (breaking change - users need to re-sync)
+    this.db.exec(`
+      DROP TABLE IF EXISTS links;
+      DROP TABLE IF EXISTS notes;
+    `);
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)
     `);
@@ -39,72 +44,9 @@ export class DatabaseManager {
     if (currentVersion === 0) {
       this.db.prepare('INSERT OR REPLACE INTO schema_version (version) VALUES (?)').run(0);
     }
-    // Notes table (minimal schema; runMigrations adds block_refs, embeds, headings, parent, etc.)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS notes (
-        id TEXT PRIMARY KEY,
-        path TEXT UNIQUE NOT NULL,
-        title TEXT NOT NULL,
-        content TEXT NOT NULL,
-        frontmatter TEXT NOT NULL,
-        tags TEXT NOT NULL,
-        hash TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        modified_at TEXT NOT NULL
-      )
-    `);
-
-    this.runMigrations(currentVersion);
-
-    // Links table (many-to-many)
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS links (
-        source_id TEXT NOT NULL,
-        target_id TEXT NOT NULL,
-        PRIMARY KEY (source_id, target_id),
-        FOREIGN KEY (source_id) REFERENCES notes(id) ON DELETE CASCADE,
-        FOREIGN KEY (target_id) REFERENCES notes(id) ON DELETE CASCADE
-      )
-    `);
-
-    // Create indexes for performance
-    this.db.exec(`
-      CREATE INDEX IF NOT EXISTS idx_notes_path ON notes(path);
-      CREATE INDEX IF NOT EXISTS idx_notes_hash ON notes(hash);
-      CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
-      CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
-    `);
 
     // New Obsidian-aligned tables
     this.initObsidianTables();
-  }
-
-  /** Run schema migrations for notes table (idempotent ALTERs for existing DBs). */
-  private runMigrations(currentVersion: number): void {
-    if (currentVersion < 1) {
-      for (const sql of [
-        `ALTER TABLE notes ADD COLUMN block_refs TEXT NOT NULL DEFAULT '[]'`,
-        `ALTER TABLE notes ADD COLUMN embeds TEXT NOT NULL DEFAULT '[]'`,
-        `ALTER TABLE notes ADD COLUMN headings TEXT NOT NULL DEFAULT '[]'`
-      ]) {
-        try {
-          this.db.exec(sql);
-        } catch {
-          /* column already exists */
-        }
-      }
-      this.db.prepare('UPDATE schema_version SET version = ?').run(1);
-    }
-    if (currentVersion < 2) {
-      for (const col of ['parent TEXT', 'basename TEXT', 'ctime INTEGER', 'mtime INTEGER', 'size INTEGER']) {
-        try {
-          this.db.exec(`ALTER TABLE notes ADD COLUMN ${col}`);
-        } catch {
-          /* column already exists */
-        }
-      }
-      this.db.prepare('UPDATE schema_version SET version = ?').run(2);
-    }
   }
 
   private initObsidianTables(): void {
@@ -256,96 +198,6 @@ export class DatabaseManager {
     `);
   }
 
-  /**
-   * Migrate data from old schema (notes table) to new schema (files + content_metadata tables).
-   * Reads existing notes, extracts positions from content, and migrates to new structure.
-   * @returns Migration statistics: { migrated: number, skipped: number, errors: number }
-   */
-  migrateFromOldSchema(): { migrated: number; skipped: number; errors: number } {
-    let migrated = 0;
-    let skipped = 0;
-    let errors = 0;
-
-    // Get all notes from old table
-    const notes = this.getAllNotes();
-    if (notes.length === 0) {
-      return { migrated: 0, skipped: 0, errors: 0 };
-    }
-
-    for (const note of notes) {
-      try {
-        // Check if already migrated (file exists in new schema)
-        const existingFile = this.getFileByPath(note.path);
-        if (existingFile) {
-          skipped++;
-          continue;
-        }
-
-        // Create FileInfo from note data
-        const ext = extname(note.path) || '.md';
-        const name = basename(note.path);
-        const basenameWithoutExt = basename(note.path, ext) || basename(note.path);
-        const parentDir = dirname(note.path);
-        const parent = parentDir === '.' ? null : parentDir;
-
-        // Use stat from note if available, otherwise use defaults
-        const ctime = note.stat?.ctime ?? Date.now();
-        const mtime = note.stat?.mtime ?? Date.now();
-        const size = note.stat?.size ?? note.content.length;
-
-        const fileInfo: FileInfo = {
-          path: note.path,
-          name,
-          basename: basenameWithoutExt,
-          extension: ext.replace(/^\./, ''), // Remove leading dot
-          parent,
-          stat: {
-            ctime,
-            mtime,
-            size
-          }
-        };
-
-        // Parse content to extract positions
-        const fullContent = this.reconstructFullContent(note);
-        const parsed = NoteParser.parse(fullContent);
-        const contentMetadata = NoteParser.parsedToContentMetadata(parsed, fullContent);
-
-        // Upsert FileInfo and ContentMetadata
-        this.upsertFile(fileInfo, note.hash);
-        this.upsertContentMetadata(note.path, contentMetadata, note.hash);
-
-        migrated++;
-      } catch (error) {
-        errors++;
-        console.error(`Error migrating note ${note.path}:`, error);
-      }
-    }
-
-    return { migrated, skipped, errors };
-  }
-
-  /**
-   * Reconstruct full content from note (including frontmatter).
-   * The note.content field contains the body, so we need to reconstruct
-   * the full content with frontmatter for accurate position extraction.
-   */
-  private reconstructFullContent(note: Note): string {
-    // If frontmatter exists, reconstruct YAML frontmatter
-    const hasFrontmatter = Object.keys(note.frontmatter).length > 0;
-    if (hasFrontmatter) {
-      try {
-        const frontmatterStr = yaml.stringify(note.frontmatter).trimEnd();
-        // Ensure proper YAML frontmatter format with newlines
-        return `---\n${frontmatterStr}\n---\n${note.content}`;
-      } catch (error) {
-        // If YAML stringify fails, just use content without frontmatter
-        console.warn(`Failed to stringify frontmatter for ${note.path}, using content only`);
-        return note.content;
-      }
-    }
-    return note.content;
-  }
 
   close(): void {
     this.db.close();
@@ -974,163 +826,6 @@ export class DatabaseManager {
     }
   }
 
-  // Note operations
-  upsertNote(note: Note): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO notes (id, path, title, content, frontmatter, tags, block_refs, embeds, headings, hash, created_at, modified_at, parent, basename, ctime, mtime, size)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(path) DO UPDATE SET
-        id = excluded.id,
-        title = excluded.title,
-        content = excluded.content,
-        frontmatter = excluded.frontmatter,
-        tags = excluded.tags,
-        block_refs = excluded.block_refs,
-        embeds = excluded.embeds,
-        headings = excluded.headings,
-        hash = excluded.hash,
-        modified_at = excluded.modified_at,
-        parent = excluded.parent,
-        basename = excluded.basename,
-        ctime = excluded.ctime,
-        mtime = excluded.mtime,
-        size = excluded.size
-    `);
-
-    const ctime = note.stat?.ctime ?? null;
-    const mtime = note.stat?.mtime ?? null;
-    const size = note.stat?.size ?? null;
-
-    stmt.run(
-      note.id,
-      note.path,
-      note.title,
-      note.content,
-      JSON.stringify(note.frontmatter),
-      JSON.stringify(note.tags),
-      JSON.stringify(note.blockRefs),
-      JSON.stringify(note.embeds),
-      JSON.stringify(note.headings),
-      note.hash,
-      note.createdAt,
-      note.modifiedAt,
-      note.parent ?? null,
-      note.basename ?? null,
-      ctime,
-      mtime,
-      size
-    );
-
-    // Update links
-    this.updateLinks(note.id, note.links);
-  }
-
-  private updateLinks(noteId: string, targetIds: string[]): void {
-    // Get existing links
-    const existingLinks = this.db.prepare('SELECT target_id FROM links WHERE source_id = ?')
-      .all(noteId)
-      .map((row: any) => row.target_id);
-    
-    // Calculate diff
-    const existingSet = new Set(existingLinks);
-    const newSet = new Set(targetIds);
-    
-    // Links to add (in newSet but not in existingSet)
-    const toAdd = targetIds.filter(id => !existingSet.has(id));
-    
-    // Links to remove (in existingSet but not in newSet)
-    const toRemove = existingLinks.filter((id: string) => !newSet.has(id));
-    
-    // Skip if no changes
-    if (toAdd.length === 0 && toRemove.length === 0) {
-      return;
-    }
-    
-    // Remove links that no longer exist
-    if (toRemove.length > 0) {
-      const placeholders = toRemove.map(() => '?').join(',');
-      this.db.prepare(`DELETE FROM links WHERE source_id = ? AND target_id IN (${placeholders})`)
-        .run(noteId, ...toRemove);
-    }
-    
-    // Add new links (only if target exists)
-    if (toAdd.length > 0) {
-      const insertStmt = this.db.prepare('INSERT OR IGNORE INTO links (source_id, target_id) VALUES (?, ?)');
-      const targetExistsStmt = this.db.prepare('SELECT 1 FROM notes WHERE id = ?');
-      
-      for (const targetId of toAdd) {
-        // Only insert if target exists
-        const targetExists = targetExistsStmt.get(targetId);
-        if (targetExists) {
-          insertStmt.run(noteId, targetId);
-        }
-      }
-    }
-  }
-
-  getNoteById(id: string): Note | null {
-    const row = this.db.prepare('SELECT * FROM notes WHERE id = ?').get(id);
-    if (!row) return null;
-    return this.rowToNote(row);
-  }
-
-  getNoteByPath(path: string): Note | null {
-    const row = this.db.prepare('SELECT * FROM notes WHERE path = ?').get(path);
-    if (!row) return null;
-    return this.rowToNote(row);
-  }
-
-  getNoteByTitle(title: string): Note | null {
-    const row = this.db.prepare('SELECT * FROM notes WHERE title = ? COLLATE NOCASE').get(title);
-    if (!row) return null;
-    return this.rowToNote(row);
-  }
-
-  searchNotes(query: string, tags?: string[], limit: number = 20): Note[] {
-    let sql = 'SELECT * FROM notes WHERE (title LIKE ? OR content LIKE ?)';
-    const params: (string | number)[] = [`%${query}%`, `%${query}%`];
-
-    if (tags && tags.length > 0) {
-      sql += ' AND (' + tags.map(() => 'tags LIKE ?').join(' OR ') + ')';
-      params.push(...tags.map(tag => `%"${tag}"%`));
-    }
-
-    sql += ' ORDER BY modified_at DESC LIMIT ?';
-    params.push(limit);
-
-    const rows = this.db.prepare(sql).all(...params);
-    return this.rowsToNotes(rows as any[]);
-  }
-
-  getBacklinks(noteId: string): Note[] {
-    const sql = `
-      SELECT n.* FROM notes n
-      JOIN links l ON n.id = l.source_id
-      WHERE l.target_id = ?
-    `;
-    const rows = this.db.prepare(sql).all(noteId);
-    return this.rowsToNotes(rows as any[]);
-  }
-
-  getOrphans(): Note[] {
-    const sql = `
-      SELECT n.* FROM notes n
-      LEFT JOIN links l1 ON n.id = l1.source_id
-      LEFT JOIN links l2 ON n.id = l2.target_id
-      WHERE l1.source_id IS NULL AND l2.target_id IS NULL
-    `;
-    const rows = this.db.prepare(sql).all();
-    return this.rowsToNotes(rows as any[]);
-  }
-
-  getAllNotes(): Note[] {
-    const rows = this.db.prepare('SELECT * FROM notes').all();
-    return this.rowsToNotes(rows as any[]);
-  }
-
-  deleteNoteByPath(path: string): void {
-    this.db.prepare('DELETE FROM notes WHERE path = ?').run(path);
-  }
 
   getStats(): { totalNotes: number; totalLinks: number; orphans: number } {
     const totalNotes = (this.db.prepare('SELECT COUNT(*) AS count FROM files').get() as { count: number }).count;
@@ -1165,124 +860,4 @@ export class DatabaseManager {
     };
   }
 
-  private rowToNote(row: any): Note {
-    const links = this.db.prepare('SELECT target_id FROM links WHERE source_id = ?').all(row.id);
-    const backlinks = this.db.prepare('SELECT source_id FROM links WHERE target_id = ?').all(row.id);
-    const ext = extname(row.path) || '.md';
-    const name = basename(row.path, ext) || basename(row.path);
-    const stat =
-      row.ctime != null && row.mtime != null && row.size != null
-        ? { ctime: row.ctime, mtime: row.mtime, size: row.size }
-        : undefined;
-
-    return {
-      id: row.id,
-      path: row.path,
-      name,
-      extension: ext,
-      title: row.title,
-      content: row.content,
-      frontmatter: JSON.parse(row.frontmatter),
-      tags: JSON.parse(row.tags),
-      links: links.map((l: any) => l.target_id),
-      backlinks: backlinks.map((l: any) => l.source_id),
-      blockRefs: JSON.parse(row.block_refs ?? '[]'),
-      embeds: JSON.parse(row.embeds ?? '[]'),
-      headings: JSON.parse(row.headings ?? '[]'),
-      hash: row.hash,
-      createdAt: row.created_at,
-      modifiedAt: row.modified_at,
-      parent: row.parent ?? undefined,
-      basename: row.basename ?? undefined,
-      stat
-    };
-  }
-
-  private getNotesWithLinksBatch(noteIds: string[]): Map<string, { links: string[], backlinks: string[] }> {
-    if (noteIds.length === 0) return new Map();
-    
-    const placeholders = noteIds.map(() => '?').join(',');
-    
-    // Single query to get all links for all notes
-    const linksSql = `
-      SELECT source_id, json_group_array(target_id) as targets
-      FROM links
-      WHERE source_id IN (${placeholders})
-      GROUP BY source_id
-    `;
-    
-    const backlinksSql = `
-      SELECT target_id, json_group_array(source_id) as sources
-      FROM links
-      WHERE target_id IN (${placeholders})
-      GROUP BY target_id
-    `;
-    
-    const result = new Map<string, { links: string[], backlinks: string[] }>();
-    
-    // Initialize with empty arrays
-    for (const id of noteIds) {
-      result.set(id, { links: [], backlinks: [] });
-    }
-    
-    // Populate links
-    const linksRows = this.db.prepare(linksSql).all(...noteIds) as any[];
-    for (const row of linksRows) {
-      const targets = JSON.parse(row.targets);
-      result.get(row.source_id)!.links = targets;
-    }
-    
-    // Populate backlinks
-    const backlinksRows = this.db.prepare(backlinksSql).all(...noteIds) as any[];
-    for (const row of backlinksRows) {
-      const sources = JSON.parse(row.sources);
-      result.get(row.target_id)!.backlinks = sources;
-    }
-    
-    return result;
-  }
-
-  private rowsToNotes(rows: any[]): Note[] {
-    if (rows.length === 0) return [];
-    
-    // Extract all note IDs
-    const noteIds = rows.map(row => row.id);
-    
-    // Batch load all links and backlinks in 2 queries
-    const linkData = this.getNotesWithLinksBatch(noteIds);
-    
-    // Map rows to notes using batched link data
-    return rows.map(row => {
-      const links = linkData.get(row.id)?.links || [];
-      const backlinks = linkData.get(row.id)?.backlinks || [];
-      const ext = extname(row.path) || '.md';
-      const name = basename(row.path, ext) || basename(row.path);
-      const stat =
-        row.ctime != null && row.mtime != null && row.size != null
-          ? { ctime: row.ctime, mtime: row.mtime, size: row.size }
-          : undefined;
-
-      return {
-        id: row.id,
-        path: row.path,
-        name,
-        extension: ext,
-        title: row.title,
-        content: row.content,
-        frontmatter: JSON.parse(row.frontmatter),
-        tags: JSON.parse(row.tags),
-        links,
-        backlinks,
-        blockRefs: JSON.parse(row.block_refs ?? '[]'),
-        embeds: JSON.parse(row.embeds ?? '[]'),
-        headings: JSON.parse(row.headings ?? '[]'),
-        hash: row.hash,
-        createdAt: row.created_at,
-        modifiedAt: row.modified_at,
-        parent: row.parent ?? undefined,
-        basename: row.basename ?? undefined,
-        stat
-      };
-    });
-  }
 }

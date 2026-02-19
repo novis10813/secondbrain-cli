@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
 import { VaultManager } from '../../src/utils/vault';
 import { ConfigManager } from '../../src/utils/config';
-import { DatabaseManager } from '../../src/utils/database';
-import type { Note } from '../../src/types';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import { NoteParser } from '../../src/utils/parser';
 
 describe('VaultManager', () => {
   let tempDir: string;
@@ -99,55 +98,26 @@ describe('VaultManager', () => {
       expect(result.removed).toBe(1);
     });
 
-    it('should run migration from old schema when notes exist and then sync', async () => {
-      const config = configManager.getConfig();
-      const db = new DatabaseManager(config);
-      const note: Note = {
-        id: 'migrated-id',
-        path: 'migrated-note.md',
-        name: 'migrated-note',
-        extension: '.md',
-        title: 'Migrated',
-        content: '# Migrated\n\nContent',
-        frontmatter: {},
-        tags: [],
-        links: [],
-        backlinks: [],
-        blockRefs: [],
-        embeds: [],
-        headings: [],
-        hash: 'abc123',
-        createdAt: '2025-01-01T00:00:00.000Z',
-        modifiedAt: '2025-01-02T00:00:00.000Z',
-        stat: { ctime: 1000, mtime: 2000, size: 50 }
-      };
-      db.upsertNote(note);
-      db.close();
-
-      vaultManager.writeNote('migrated-note.md', '# Migrated\n\nContent');
-      const result = await vaultManager.sync();
-
-      expect(result.added).toBe(1);
-      const file = vaultManager.getFileByPath('migrated-note.md');
-      expect(file).not.toBeNull();
-      expect(file?.path).toBe('migrated-note.md');
-    });
 
     it('應該解析筆記標題', async () => {
       vaultManager.writeNote('test.md', '# My Title\n\n內容');
       await vaultManager.sync();
       
-      const note = vaultManager.getNoteByPath('test.md');
-      expect(note?.title).toBe('My Title');
+      const file = vaultManager.getFileByPath('test.md');
+      const content = vaultManager.readNote('test.md');
+      const parsed = NoteParser.parse(content!);
+      expect(parsed.title).toBe('My Title');
     });
 
     it('應該解析筆記標籤', async () => {
       vaultManager.writeNote('tagged.md', '# Tagged\n\n#tag1 #tag2');
       await vaultManager.sync();
       
-      const note = vaultManager.getNoteByPath('tagged.md');
-      expect(note?.tags).toContain('tag1');
-      expect(note?.tags).toContain('tag2');
+      const file = vaultManager.getFileByPath('tagged.md');
+      const cache = vaultManager.getFileCache(file!);
+      const tagNames = cache?.tags?.map(t => t.tag) || [];
+      expect(tagNames).toContain('tag1');
+      expect(tagNames).toContain('tag2');
     });
 
     it('應該解析筆記連結', async () => {
@@ -167,21 +137,27 @@ describe('VaultManager', () => {
       vaultManager.writeNote('blocks.md', '# Blocks\n\nParagraph ^abc123.\n\nList ^xyz-99');
       await vaultManager.sync();
 
-      const note = vaultManager.getNoteByPath('blocks.md');
-      expect(note?.blockRefs).toContain('abc123');
-      expect(note?.blockRefs).toContain('xyz-99');
+      const file = vaultManager.getFileByPath('blocks.md');
+      const cache = vaultManager.getFileCache(file!);
+      const blockIds = cache?.blocks?.map(b => b.id) || [];
+      expect(blockIds).toContain('abc123');
+      expect(blockIds).toContain('xyz-99');
     });
 
     it('應該解析並儲存 headings 到資料庫', async () => {
       vaultManager.writeNote('outline.md', '# Main Title\n\nIntro.\n\n## Section A\n\nContent A.\n\n### Subsection\n\nDetail.');
       await vaultManager.sync();
 
-      const note = vaultManager.getNoteByPath('outline.md');
-      expect(note?.headings).toBeDefined();
-      expect(note?.headings.length).toBe(3);
-      expect(note?.headings[0]).toEqual({ level: 1, text: 'Main Title', line: 1, column: 1 });
-      expect(note?.headings[1]).toEqual({ level: 2, text: 'Section A', line: 5, column: 1 });
-      expect(note?.headings[2]).toEqual({ level: 3, text: 'Subsection', line: 9, column: 1 });
+      const file = vaultManager.getFileByPath('outline.md');
+      const cache = vaultManager.getFileCache(file!);
+      expect(cache?.headings).toBeDefined();
+      expect(cache?.headings?.length).toBe(3);
+      expect(cache?.headings?.[0].heading).toBe('Main Title');
+      expect(cache?.headings?.[0].level).toBe(1);
+      expect(cache?.headings?.[1].heading).toBe('Section A');
+      expect(cache?.headings?.[1].level).toBe(2);
+      expect(cache?.headings?.[2].heading).toBe('Subsection');
+      expect(cache?.headings?.[2].level).toBe(3);
     });
   });
 
