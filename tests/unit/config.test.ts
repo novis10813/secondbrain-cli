@@ -23,14 +23,14 @@ describe('ConfigManager', () => {
   describe('init', () => {
     it('應該創建 .secondbrain 目錄', () => {
       configManager.init();
-      
+
       const fs = require('fs');
       expect(fs.existsSync(join(tempDir, '.secondbrain'))).toBe(true);
     });
 
     it('應該創建預設設定檔', () => {
       const config = configManager.init();
-      
+
       expect(config.vaultPath).toBe(tempDir);
       expect(config.dailyNotesFolder).toBe('Daily');
       expect(config.templatesFolder).toBe('Templates');
@@ -39,7 +39,7 @@ describe('ConfigManager', () => {
 
     it('應該寫入設定檔到磁碟', () => {
       configManager.init();
-      
+
       const fs = require('fs');
       expect(fs.existsSync(join(tempDir, '.secondbrain/config.json'))).toBe(true);
     });
@@ -65,7 +65,7 @@ describe('ConfigManager', () => {
     it('應該載入已儲存的設定', () => {
       configManager.init();
       const loaded = configManager.loadConfig();
-      
+
       expect(loaded).not.toBeNull();
       expect(loaded?.vaultPath).toBe(tempDir);
       expect(loaded?.dailyNotesFolder).toBe('Daily');
@@ -97,7 +97,7 @@ describe('ConfigManager', () => {
     it('應該回傳設定物件', () => {
       configManager.init();
       const config = configManager.getConfig();
-      
+
       expect(config.vaultPath).toBe(tempDir);
     });
   });
@@ -106,7 +106,7 @@ describe('ConfigManager', () => {
     it('應該更新特定設定值', () => {
       configManager.init();
       configManager.updateConfig({ dailyNotesFolder: 'Journal' });
-      
+
       const config = configManager.getConfig();
       expect(config.dailyNotesFolder).toBe('Journal');
     });
@@ -114,7 +114,7 @@ describe('ConfigManager', () => {
     it('應該保留未更新的設定值', () => {
       configManager.init();
       configManager.updateConfig({ dailyNotesFolder: 'Journal' });
-      
+
       const config = configManager.getConfig();
       expect(config.templatesFolder).toBe('Templates');
       expect(config.vaultPath).toBe(tempDir);
@@ -123,7 +123,7 @@ describe('ConfigManager', () => {
     it('應該將更新寫入磁碟', () => {
       configManager.init();
       configManager.updateConfig({ dailyNotesFolder: 'Journal' });
-      
+
       // 建立新的 ConfigManager 實例來驗證持久化
       const newManager = new ConfigManager(tempDir);
       const config = newManager.getConfig();
@@ -134,7 +134,7 @@ describe('ConfigManager', () => {
   describe('findVaultPath', () => {
     it('應該在當前目錄找到 vault', () => {
       configManager.init();
-      
+
       const found = ConfigManager.findVaultPath(tempDir);
       expect(found).toBe(tempDir);
     });
@@ -143,7 +143,7 @@ describe('ConfigManager', () => {
       configManager.init();
       const subDir = join(tempDir, 'sub', 'folder');
       mkdirSync(subDir, { recursive: true });
-      
+
       const found = ConfigManager.findVaultPath(subDir);
       expect(found).toBe(tempDir);
     });
@@ -151,6 +151,39 @@ describe('ConfigManager', () => {
     it('應該在找不到 vault 時回傳 null', () => {
       const found = ConfigManager.findVaultPath(tempDir);
       expect(found).toBeNull();
+    });
+  });
+
+  describe('template config', () => {
+    it('getTemplateConfig 在沒有設定時應回傳 undefined', () => {
+      configManager.init();
+      const templateConfig = (configManager as any).getTemplateConfig('non-existent');
+      expect(templateConfig).toBeUndefined();
+    });
+
+    it('setTemplateConfig 應寫入 templates[name].targetFolder', () => {
+      configManager.init();
+      (configManager as any).setTemplateConfig('meeting', { targetFolder: 'Meetings' });
+
+      const config = configManager.getConfig();
+      expect(config.templates?.['meeting']?.targetFolder).toBe('Meetings');
+    });
+
+    it('setTemplateConfig 可更新已存在的模板設定', () => {
+      configManager.init();
+      (configManager as any).setTemplateConfig('meeting', { targetFolder: 'Meetings' });
+      (configManager as any).setTemplateConfig('meeting', { targetFolder: 'NewMeetings' });
+
+      const config = configManager.getConfig();
+      expect(config.templates?.['meeting']?.targetFolder).toBe('NewMeetings');
+    });
+
+    it('captureFolder 應該可以讀取與寫入', () => {
+      configManager.init();
+      configManager.updateConfig({ captureFolder: 'Inbox' });
+
+      const config = configManager.getConfig();
+      expect(config.captureFolder).toBe('Inbox');
     });
   });
 });

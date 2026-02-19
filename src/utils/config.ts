@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import type { Config } from '../types/index.js';
+import type { Config, TemplateConfig } from '../types/index.js';
 
 const CONFIG_FILE = '.secondbrain/config.json';
 const DB_FILE = '.secondbrain/index.db';
@@ -72,6 +72,20 @@ export class ConfigManager {
   updateConfig(updates: Partial<Config>): void {
     const config = this.getConfig();
     Object.assign(config, updates);
+    this.saveConfig(config);
+  }
+
+  getTemplateConfig(name: string): TemplateConfig | undefined {
+    const config = this.getConfig();
+    return config.templates?.[name];
+  }
+
+  setTemplateConfig(name: string, templateConfig: TemplateConfig): void {
+    const config = this.getConfig();
+    if (!config.templates) {
+      config.templates = {};
+    }
+    config.templates[name] = templateConfig;
     this.saveConfig(config);
   }
 
