@@ -53,9 +53,7 @@ export function createCaptureCommand(): Command {
         noteContent = NoteParser.generateNoteContent(title, body, frontmatter);
 
         vault.writeNote(notePath, noteContent);
-
-        // Index the new file by syncing (will only process changed files)
-        await vault.sync();
+        vault.indexSingleFile(notePath);
 
         const file = vault.getFileByPath(notePath);
 

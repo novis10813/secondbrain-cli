@@ -99,6 +99,34 @@ export class VaultManager {
     return { added, updated, removed };
   }
 
+  /**
+   * Rapidly index a single file without a full vault scan.
+   * Useful for capture or real-time updates.
+   */
+  indexSingleFile(relativePath: string): void {
+    const fullPath = join(this._config.vaultPath, relativePath);
+    if (!existsSync(fullPath)) {
+      throw new Error(`File not found: ${fullPath}`);
+    }
+
+    const content = readFileSync(fullPath, 'utf-8');
+    const hash = NoteParser.computeHash(content);
+    const fileInfo = this.createFileInfo(relativePath, fullPath);
+    const parsed = NoteParser.parse(content);
+    const contentMetadata = NoteParser.parsedToContentMetadata(parsed, content);
+
+    this.db.upsertFile(fileInfo, hash);
+    this.db.upsertContentMetadata(relativePath, contentMetadata, hash);
+
+    // Resolve outlinks of this file immediately
+    for (const link of parsed.links) {
+      const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
+      if (linkedFile) {
+        this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
+      }
+    }
+  }
+
   private findMarkdownFiles(): string[] {
     const files: string[] = [];
     const excludeDirs = ['.git', '.secondbrain', 'node_modules'];

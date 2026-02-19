@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Command } from 'commander';
+import { VaultManager } from '../../src/utils/vault';
 
 describe('capture path resolution', () => {
     let tempDir: string;
@@ -82,5 +83,25 @@ describe('capture path resolution', () => {
         expect(error).toBeDefined();
         // Commander 3.0+ throws error with code 'commander.unknownOption'
         expect((error as any).code).toBe('commander.unknownOption');
+    });
+
+    it('capture 後應在 DB 中建立索引（getFileByPath 應成功）', async () => {
+        const cmd = createCaptureCommand();
+        configManager.updateConfig({ captureFolder: 'Inbox' });
+
+        await executeAction(cmd, '索引測試內容', '索引測試');
+
+        // 需要建立一個 VaultManager 來檢查 DB 狀態
+        // 由於 executeAction 呼叫了 commander，而 commander 呼叫了 withVault，
+        // withVault 會建立自己的 VaultManager 並在結束時 close
+        // 我們這裡再建立一個新的來驗證
+        const vault = new VaultManager(configManager.getConfig());
+        const file = vault.getFileByPath('Inbox/索引測試.md');
+        const cache = file ? vault.getFileCache(file) : null;
+        vault.close();
+
+        expect(file).not.toBeNull();
+        expect(file?.path).toBe('Inbox/索引測試.md');
+        expect(cache).not.toBeNull();
     });
 });
