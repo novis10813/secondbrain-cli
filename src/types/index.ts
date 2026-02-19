@@ -156,11 +156,17 @@ export interface SearchFilters {
   limit?: number;
 }
 
+export interface TemplateConfig {
+  targetFolder?: string;
+}
+
 export interface Config {
   vaultPath: string;
+  captureFolder?: string;
   dailyNotesFolder: string;
   templatesFolder: string;
   dbPath: string;
+  templates?: Record<string, TemplateConfig>;
 }
 
 export interface Template {
