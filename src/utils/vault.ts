@@ -5,12 +5,16 @@ import { DatabaseManager } from './database.js';
 import { NoteParser, type ParsedNote } from './parser.js';
 
 export class VaultManager {
-  private config: Config;
+  private _config: Config;
   private db: DatabaseManager;
 
   constructor(config: Config) {
-    this.config = config;
+    this._config = config;
     this.db = new DatabaseManager(config);
+  }
+
+  get config(): Config {
+    return this._config;
   }
 
   close(): void {
@@ -29,7 +33,7 @@ export class VaultManager {
 
     // Pass 1: Collect all files, parse once, upsert FileInfo + ContentMetadata
     for (const filePath of markdownFiles) {
-      const relativePath = relative(this.config.vaultPath, filePath);
+      const relativePath = relative(this._config.vaultPath, filePath);
       currentPaths.add(relativePath);
 
       const content = readFileSync(filePath, 'utf-8');
@@ -116,7 +120,7 @@ export class VaultManager {
       }
     };
 
-    walk(this.config.vaultPath);
+    walk(this._config.vaultPath);
     return files;
   }
 
@@ -149,7 +153,7 @@ export class VaultManager {
 
   // Write note to file
   writeNote(path: string, content: string): void {
-    const fullPath = join(this.config.vaultPath, path);
+    const fullPath = join(this._config.vaultPath, path);
 
     // Ensure directory exists
     const dir = dirname(fullPath);
@@ -161,7 +165,7 @@ export class VaultManager {
   }
 
   readNote(path: string): string | null {
-    const fullPath = join(this.config.vaultPath, path);
+    const fullPath = join(this._config.vaultPath, path);
     if (!existsSync(fullPath)) {
       return null;
     }
@@ -174,12 +178,12 @@ export class VaultManager {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    return join(this.config.dailyNotesFolder, `${dateStr}.md`);
+    return join(this._config.dailyNotesFolder, `${dateStr}.md`);
   }
 
   // Get template path
   getTemplatePath(templateName: string): string {
-    return join(this.config.templatesFolder, `${templateName}.md`);
+    return join(this._config.templatesFolder, `${templateName}.md`);
   }
 
   getStats() {
