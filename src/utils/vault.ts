@@ -80,6 +80,8 @@ export class VaultManager {
     // Pass 2: Resolve link targets using cached parsed data (no second read/parse)
     for (const [relativePath, parsed] of parsedByPath) {
       for (const link of parsed.links) {
+        // Guard: skip links with undefined/non-string targets (e.g. from template placeholders)
+        if (!link.target || typeof link.target !== 'string') continue;
         const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
         if (linkedFile) {
           this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
@@ -120,6 +122,8 @@ export class VaultManager {
 
     // Resolve outlinks of this file immediately
     for (const link of parsed.links) {
+      // Guard: skip links with undefined/non-string targets (e.g. from template placeholders)
+      if (!link.target || typeof link.target !== 'string') continue;
       const linkedFile = this.getFirstLinkpathDest(link.target, relativePath);
       if (linkedFile) {
         this.db.updateLinkTarget(relativePath, link.position.start.offset, linkedFile.path, null);
@@ -325,6 +329,8 @@ export class VaultManager {
    * @returns FileInfo or null if not found
    */
   getFirstLinkpathDest(linkpath: string, sourcePath: string): FileInfo | null {
+    // Guard: reject undefined, null, or non-string values (e.g. from template placeholders in frontmatter)
+    if (!linkpath || typeof linkpath !== 'string') return null;
     // Strip heading/block reference (everything after #)
     const filePart = linkpath.split('#')[0].trim();
     if (!filePart) return null;

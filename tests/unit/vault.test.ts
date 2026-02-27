@@ -26,14 +26,14 @@ describe('VaultManager', () => {
   describe('writeNote', () => {
     it('應該寫入筆記檔案', () => {
       vaultManager.writeNote('test.md', '# Test\n\n內容');
-      
+
       const fs = require('fs');
       expect(fs.existsSync(join(tempDir, 'test.md'))).toBe(true);
     });
 
     it('應該自動創建父目錄', () => {
       vaultManager.writeNote('Projects/api.md', '# API\n\n內容');
-      
+
       const fs = require('fs');
       expect(fs.existsSync(join(tempDir, 'Projects/api.md'))).toBe(true);
     });
@@ -41,7 +41,7 @@ describe('VaultManager', () => {
     it('應該寫入正確的內容', () => {
       const content = '# 標題\n\n這是內容';
       vaultManager.writeNote('note.md', content);
-      
+
       const read = vaultManager.readNote('note.md');
       expect(read).toBe(content);
     });
@@ -51,7 +51,7 @@ describe('VaultManager', () => {
     it('應該讀取筆記內容', () => {
       const content = '# Test\n\n內容';
       vaultManager.writeNote('test.md', content);
-      
+
       const read = vaultManager.readNote('test.md');
       expect(read).toBe(content);
     });
@@ -65,9 +65,9 @@ describe('VaultManager', () => {
   describe('sync', () => {
     it('應該新增新筆記到資料庫', async () => {
       vaultManager.writeNote('new-note.md', '# New Note\n\n內容');
-      
+
       const result = await vaultManager.sync();
-      
+
       expect(result.added).toBe(1);
       expect(result.updated).toBe(0);
       expect(result.removed).toBe(0);
@@ -76,25 +76,25 @@ describe('VaultManager', () => {
     it('應該偵測更新的筆記', async () => {
       vaultManager.writeNote('note.md', '# Note\n\n原始內容');
       await vaultManager.sync();
-      
+
       // 等待一下確保修改時間不同
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       vaultManager.writeNote('note.md', '# Note\n\n更新內容');
       const result = await vaultManager.sync();
-      
+
       expect(result.updated).toBe(1);
     });
 
     it('應該移除已刪除的筆記', async () => {
       vaultManager.writeNote('to-delete.md', '# Delete Me');
       await vaultManager.sync();
-      
+
       const fs = require('fs');
       fs.unlinkSync(join(tempDir, 'to-delete.md'));
-      
+
       const result = await vaultManager.sync();
-      
+
       expect(result.removed).toBe(1);
     });
 
@@ -102,7 +102,7 @@ describe('VaultManager', () => {
     it('應該解析筆記標題', async () => {
       vaultManager.writeNote('test.md', '# My Title\n\n內容');
       await vaultManager.sync();
-      
+
       const file = vaultManager.getFileByPath('test.md');
       const content = vaultManager.readNote('test.md');
       const parsed = NoteParser.parse(content!);
@@ -112,7 +112,7 @@ describe('VaultManager', () => {
     it('應該解析筆記標籤', async () => {
       vaultManager.writeNote('tagged.md', '# Tagged\n\n#tag1 #tag2');
       await vaultManager.sync();
-      
+
       const file = vaultManager.getFileByPath('tagged.md');
       const cache = vaultManager.getFileCache(file!);
       const tagNames = cache?.tags?.map(t => t.tag) || [];
@@ -166,20 +166,20 @@ describe('VaultManager', () => {
       vaultManager.writeNote('api-design.md', '# API Design\n\nRESTful API 設計原則');
       vaultManager.writeNote('backend.md', '# Backend\n\n後端開發注意事項');
       vaultManager.writeNote('frontend.md', '# Frontend\n\n前端設計');
-      
+
       await vaultManager.sync();
     });
 
     it('應該依 path/basename 搜尋', () => {
       const results = vaultManager.searchFiles('api');
-      
+
       expect(results.length).toBeGreaterThan(0);
       expect(results.some(r => r.file.basename === 'api-design')).toBe(true);
     });
 
     it('應該依 basename 搜尋', () => {
       const results = vaultManager.searchFiles('backend');
-      
+
       expect(results.length).toBeGreaterThan(0);
       expect(results.some(r => r.file.basename === 'backend')).toBe(true);
     });
@@ -187,9 +187,9 @@ describe('VaultManager', () => {
     it('應該支援標籤過濾', async () => {
       vaultManager.writeNote('tagged.md', '---\ntags: [work]\n---\n\n# Tagged Note');
       await vaultManager.sync();
-      
+
       const results = vaultManager.searchFiles('', ['work']);
-      
+
       expect(results.some(r => r.file.basename === 'tagged')).toBe(true);
     });
 
@@ -230,13 +230,13 @@ describe('VaultManager', () => {
     it('應該找到連結到指定筆記的其他筆記', async () => {
       vaultManager.writeNote('target.md', '# Target\n\n目標筆記');
       await vaultManager.sync();
-      
+
       vaultManager.writeNote('link1.md', '# Link1\n\n連結到 [[target]]');
       vaultManager.writeNote('link2.md', '# Link2\n\n連結到 [[target]]');
       await vaultManager.sync();
-      
+
       const backlinks = vaultManager.getBacklinksByPath('target.md');
-      
+
       expect(backlinks.length).toBe(2);
       expect(backlinks.some(f => f.basename === 'link1')).toBe(true);
       expect(backlinks.some(f => f.basename === 'link2')).toBe(true);
@@ -265,11 +265,11 @@ describe('VaultManager', () => {
       vaultManager.writeNote('linked.md', '# Linked\n\n連結到 [[other]]');
       vaultManager.writeNote('other.md', '# Other\n\n被連結');
       vaultManager.writeNote('orphan.md', '# Orphan\n\n孤兒筆記');
-      
+
       await vaultManager.sync();
-      
+
       const orphans = vaultManager.getOrphanFiles();
-      
+
       expect(orphans.some(f => f.basename === 'orphan')).toBe(true);
       expect(orphans.some(f => f.basename === 'linked')).toBe(false);
     });
@@ -279,11 +279,11 @@ describe('VaultManager', () => {
     it('應該回傳正確的統計資訊', async () => {
       vaultManager.writeNote('note1.md', '# Note1');
       vaultManager.writeNote('note2.md', '# Note2\n\n連結到 [[note1]]');
-      
+
       await vaultManager.sync();
-      
+
       const stats = vaultManager.getStats();
-      
+
       expect(stats.totalNotes).toBe(2);
       expect(stats.totalLinks).toBeGreaterThanOrEqual(0);
       expect(stats.orphans).toBeGreaterThanOrEqual(0);
@@ -327,14 +327,14 @@ describe('VaultManager', () => {
     it('應該回傳正確的每日筆記路徑', () => {
       const date = new Date('2024-01-15');
       const path = vaultManager.getDailyNotePath(date);
-      
+
       expect(path).toBe('Daily/2024-01-15.md');
     });
 
     it('應該使用今天的日期當預設值', () => {
       const today = new Date().toISOString().split('T')[0];
       const path = vaultManager.getDailyNotePath();
-      
+
       expect(path).toContain(today);
     });
   });
@@ -342,7 +342,7 @@ describe('VaultManager', () => {
   describe('getTemplatePath', () => {
     it('應該回傳正確的模板路徑', () => {
       const path = vaultManager.getTemplatePath('meeting');
-      
+
       expect(path).toBe('Templates/meeting.md');
     });
   });
@@ -429,7 +429,7 @@ describe('VaultManager', () => {
     describe('getFileByPath', () => {
       it('should return FileInfo for existing file', () => {
         const file = vaultManager.getFileByPath('simple.md');
-        
+
         expect(file).not.toBeNull();
         expect(file?.path).toBe('simple.md');
         expect(file?.name).toBe('simple.md');
@@ -445,7 +445,7 @@ describe('VaultManager', () => {
 
       it('should return FileInfo for nested file', () => {
         const file = vaultManager.getFileByPath('folder/nested.md');
-        
+
         expect(file).not.toBeNull();
         expect(file?.path).toBe('folder/nested.md');
         expect(file?.parent).toBe('folder');
@@ -532,9 +532,9 @@ describe('VaultManager', () => {
       it('should return ContentMetadata for FileInfo', () => {
         const file = vaultManager.getFileByPath('simple.md');
         expect(file).not.toBeNull();
-        
+
         const cache = vaultManager.getFileCache(file!);
-        
+
         expect(cache).not.toBeNull();
         expect(cache?.headings).toBeDefined();
         expect(cache?.headings?.length).toBeGreaterThan(0);
@@ -550,7 +550,7 @@ describe('VaultManager', () => {
           parent: null,
           stat: { ctime: 0, mtime: 0, size: 0 }
         };
-        
+
         const cache = vaultManager.getFileCache(file);
         expect(cache).toBeNull();
       });
@@ -558,12 +558,12 @@ describe('VaultManager', () => {
       it('should return ContentMetadata with links and tags', async () => {
         vaultManager.writeNote('linked.md', '# Linked\n\n[[simple]] and #tag');
         await vaultManager.sync();
-        
+
         const file = vaultManager.getFileByPath('linked.md');
         expect(file).not.toBeNull();
-        
+
         const cache = vaultManager.getFileCache(file!);
-        
+
         expect(cache).not.toBeNull();
         expect(cache?.links).toBeDefined();
         expect(cache?.links?.length).toBeGreaterThan(0);
@@ -575,7 +575,7 @@ describe('VaultManager', () => {
     describe('getFirstLinkpathDest', () => {
       it('should resolve simple filename', () => {
         const dest = vaultManager.getFirstLinkpathDest('simple', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('simple.md');
         expect(dest?.basename).toBe('simple');
@@ -583,28 +583,28 @@ describe('VaultManager', () => {
 
       it('should resolve filename with extension', () => {
         const dest = vaultManager.getFirstLinkpathDest('simple.md', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('simple.md');
       });
 
       it('should resolve nested path', () => {
         const dest = vaultManager.getFirstLinkpathDest('folder/nested', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('folder/nested.md');
       });
 
       it('should strip heading reference', () => {
         const dest = vaultManager.getFirstLinkpathDest('simple#heading', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('simple.md');
       });
 
       it('should strip block reference', () => {
         const dest = vaultManager.getFirstLinkpathDest('simple#^block-id', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('simple.md');
       });
@@ -613,43 +613,74 @@ describe('VaultManager', () => {
         vaultManager.writeNote('folder/source.md', '# Source');
         vaultManager.writeNote('folder/target.md', '# Target');
         await vaultManager.sync();
-        
+
         const dest = vaultManager.getFirstLinkpathDest('target', 'folder/source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('folder/target.md');
       });
 
       it('should resolve filename with spaces (dash variation)', () => {
         const dest = vaultManager.getFirstLinkpathDest('note with spaces', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.path).toBe('note with spaces.md');
       });
 
       it('should resolve by basename match', () => {
         const dest = vaultManager.getFirstLinkpathDest('simple', 'source.md');
-        
+
         expect(dest).not.toBeNull();
         expect(dest?.basename).toBe('simple');
       });
 
       it('should return null for non-existent linkpath', () => {
         const dest = vaultManager.getFirstLinkpathDest('nonexistent', 'source.md');
-        
+
         expect(dest).toBeNull();
       });
 
-      it('should return null for empty linkpath', () => {
-        const dest = vaultManager.getFirstLinkpathDest('', 'source.md');
-        
-        expect(dest).toBeNull();
+      it('should return null for undefined or non-string linkpath', () => {
+        expect(vaultManager.getFirstLinkpathDest(undefined as any, 'source.md')).toBeNull();
+        expect(vaultManager.getFirstLinkpathDest(null as any, 'source.md')).toBeNull();
+        expect(vaultManager.getFirstLinkpathDest(123 as any, 'source.md')).toBeNull();
+      });
+    });
+
+    describe('sync with template placeholders', () => {
+      it('should sync vault containing template files with {{DATE:YYYYMMDD}} without crashing', async () => {
+        vaultManager.writeNote('templates/meeting.md', `---
+date: "{{DATE:YYYYMMDD}}"
+title: "{{TITLE}}"
+tags: [meeting, template]
+---
+
+# {{TITLE}}
+
+[[some-link]]`);
+        // Should not throw
+        const result = await vaultManager.sync();
+        expect(result.added).toBe(1); // only the new template file
+
+        // Second sync must not crash (tests the cached-path in Pass 2)
+        const result2 = await vaultManager.sync();
+        expect(result2.added).toBe(0);
+        expect(result2.updated).toBe(0);
       });
 
-      it('should handle linkpath with only heading reference', () => {
-        const dest = vaultManager.getFirstLinkpathDest('#heading', 'source.md');
-        
-        expect(dest).toBeNull();
+      it('should sync vault with unquoted {{DATE:YYYYMMDD}} in frontmatter without crashing', async () => {
+        vaultManager.writeNote('templates/daily.md', `---
+date: {{DATE:YYYYMMDD}}
+---
+
+# Daily Note`);
+        // Should not throw
+        const result = await vaultManager.sync();
+        expect(result.added).toBe(1); // only the new template file
+
+        // Second sync must not crash
+        const result2 = await vaultManager.sync();
+        expect(result2.added).toBe(0);
       });
     });
   });

@@ -225,7 +225,40 @@ export class NoteParser {
 
     if (match) {
       try {
-        const frontmatter = yaml.parse(match[1]) || {};
+        // Pre-process: replace {{PLACEHOLDER}} template syntax with quoted strings
+        // before YAML parsing, to prevent YAML from interpreting {key:val} as a flow mapping.
+        // We restore the original values after parsing.
+        const placeholderMap = new Map<string, string>();
+        let idx = 0;
+        const sanitized = match[1].replace(/\{\{[^}]+\}\}/g, (m) => {
+          const key = `__SBPH${idx++}_`;
+          placeholderMap.set(key, m);
+          // Use bare scalar (no quotes) so YAML parses it as a plain string.
+          // This works whether the original value was quoted or unquoted.
+          return key;
+        });
+
+        const raw = yaml.parse(sanitized) || {};
+
+        // Post-process: walk parsed object and restore placeholder strings
+        const restore = (obj: unknown): unknown => {
+          if (typeof obj === 'string') {
+            let s = obj;
+            for (const [k, v] of placeholderMap) {
+              s = s.replace(k, v);
+            }
+            return s;
+          }
+          if (Array.isArray(obj)) return obj.map(restore);
+          if (obj && typeof obj === 'object') {
+            return Object.fromEntries(
+              Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, restore(v)])
+            );
+          }
+          return obj;
+        };
+
+        const frontmatter = restore(raw) as Record<string, unknown>;
         const body = content.slice(match[0].length);
         return { frontmatter, body, bodyStartIndex: match[0].length };
       } catch {

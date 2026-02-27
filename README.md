@@ -72,6 +72,8 @@ SecondBrain CLI groups commands into a few core utilities. Each has its own usag
   See `docs/search.md`.
 - **Links & navigation**: `sb backlinks`, `sb outlinks`, `sb open` — link graph and positions  
   See `docs/backlinks.md` and `docs/open.md`.
+- **Note access**: `sb get` — retrieve a note's content and metadata by path or basename  
+  See `docs/get.md`.
 - **Config & maintenance**: `sb config`, `sb stats`, `sb orphans`, `sb migrate`  
   See `docs/config.md`, `docs/stats.md`, and `docs/migrate.md`.
 

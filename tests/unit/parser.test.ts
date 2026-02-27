@@ -619,6 +619,55 @@ Inline \`![[fake]]\` ignored.`;
       expect(parsed.embeds).toHaveLength(1);
       expect(parsed.embeds[0].target).toBe('image.png');
     });
+
+    describe('template placeholder robustness', () => {
+      it('should parse frontmatter with quoted {{DATE:YYYYMMDD}} placeholder as string, not object', () => {
+        const content = `---
+date: "{{DATE:YYYYMMDD}}"
+tags: [daily]
+---
+
+# Title
+
+Body.`;
+        const parsed = NoteParser.parse(content);
+
+        expect(parsed.frontmatter['tags']).toEqual(['daily']);
+        // Quoted value must remain a plain string
+        expect(parsed.frontmatter['date']).toBe('{{DATE:YYYYMMDD}}');
+        expect(typeof parsed.frontmatter['date']).toBe('string');
+      });
+
+      it('should not produce object keys in frontmatter for unquoted {{DATE:YYYYMMDD}} — value must not be an object', () => {
+        const content = `---
+date: {{DATE:YYYYMMDD}}
+---
+
+# Title`;
+        const parsed = NoteParser.parse(content);
+
+        // The date value should NOT be a JS object ({} or similar), it should be a string or absent
+        const dateVal = parsed.frontmatter['date'];
+        expect(typeof dateVal === 'object' && dateVal !== null && !Array.isArray(dateVal)).toBe(false);
+      });
+
+      it('should not crash when extracting links from frontmatter with nested object values from YAML flow mappings', () => {
+        // YAML flow mapping like {DATE: YYYYMMDD} becomes an object - we must not pass undefined to link resolution
+        const content = `---
+template_key: {DATE: YYYYMMDD}
+related: "[[My Note]]"
+---
+
+# Doc`;
+        const parsed = NoteParser.parse(content);
+
+        // Must not contain any undefined/non-string targets
+        expect(parsed.links.every(l => typeof l.target === 'string' && l.target.length > 0)).toBe(true);
+        // The wikilink in related field should still be extracted
+        expect(parsed.links.some(l => l.target === 'My Note')).toBe(true);
+      });
+    });
+
   });
 
   describe('list structure extraction', () => {
