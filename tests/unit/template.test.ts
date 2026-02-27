@@ -76,7 +76,7 @@ date: {{date}}
       templateManager.createTemplate('project', '# Project');
 
       const templates = templateManager.listTemplates();
-      
+
       expect(templates).toContain('meeting');
       expect(templates).toContain('daily');
       expect(templates).toContain('project');
@@ -92,9 +92,9 @@ date: {{date}}
   describe('deleteTemplate', () => {
     it('應該刪除模板', () => {
       templateManager.createTemplate('to-delete', '# Delete Me');
-      
+
       templateManager.deleteTemplate('to-delete');
-      
+
       const templatePath = join(tempDir, 'Templates', 'to-delete.md');
       expect(existsSync(templatePath)).toBe(false);
     });
@@ -110,7 +110,7 @@ date: {{date}}
       templateManager.createTemplate('greeting', template);
 
       const result = templateManager.renderTemplate('greeting', { name: 'World' });
-      
+
       expect(result).toBe('Hello World!');
     });
 
@@ -118,22 +118,22 @@ date: {{date}}
       const template = '{{greeting}} {{name}}, today is {{date}}';
       templateManager.createTemplate('multi', template);
 
-      const result = templateManager.renderTemplate('multi', { 
-        greeting: 'Hello', 
-        name: 'Alice', 
-        date: '2024-01-15' 
+      const result = templateManager.renderTemplate('multi', {
+        greeting: 'Hello',
+        name: 'Alice',
+        date: '2024-01-15'
       });
-      
+
       expect(result).toBe('Hello Alice, today is 2024-01-15');
     });
 
-    it('應該保留未匹配的變數', () => {
+    it('應該將未匹配的變數替換為空字串', () => {
       const template = 'Hello {{name}}, your code is {{code}}';
       templateManager.createTemplate('partial', template);
 
       const result = templateManager.renderTemplate('partial', { name: 'Bob' });
-      
-      expect(result).toBe('Hello Bob, your code is {{code}}');
+
+      expect(result).toBe('Hello Bob, your code is ');
     });
 
     it('應該支援模板中的 frontmatter', () => {
@@ -147,12 +147,12 @@ tags: [{{tag}}]
 {{content}}`;
       templateManager.createTemplate('note', template);
 
-      const result = templateManager.renderTemplate('note', { 
-        title: 'My Note', 
+      const result = templateManager.renderTemplate('note', {
+        title: 'My Note',
         tag: 'work',
         content: 'This is the content.'
       });
-      
+
       expect(result).toContain('title: My Note');
       expect(result).toContain('tags: [work]');
       expect(result).toContain('# My Note');
@@ -162,6 +162,15 @@ tags: [{{tag}}]
     it('應該在不存在的模板上拋出錯誤', () => {
       expect(() => templateManager.renderTemplate('non-existent', {})).toThrow();
     });
+
+    it('應該將未提供的所有 placeholder 替換為空字串', () => {
+      const template = '{{a}} and {{b}} and {{c}}';
+      templateManager.createTemplate('all_missing', template);
+
+      const result = templateManager.renderTemplate('all_missing', { a: 'hello' });
+
+      expect(result).toBe('hello and  and ');
+    });
   });
 
   describe('validateTemplate', () => {
@@ -170,7 +179,7 @@ tags: [{{tag}}]
       templateManager.createTemplate('user', template);
 
       const variables = templateManager.validateTemplate('user');
-      
+
       expect(variables).toContain('name');
       expect(variables).toContain('email');
       expect(variables.length).toBe(2);
@@ -186,7 +195,7 @@ author: {{author}}
       templateManager.createTemplate('article', template);
 
       const variables = templateManager.validateTemplate('article');
-      
+
       expect(variables).toContain('title');
       expect(variables).toContain('author');
     });
@@ -196,7 +205,7 @@ author: {{author}}
       templateManager.createTemplate('simple', template);
 
       const variables = templateManager.validateTemplate('simple');
-      
+
       expect(variables).toEqual([]);
     });
 
@@ -205,7 +214,7 @@ author: {{author}}
       templateManager.createTemplate('duplicate', template);
 
       const variables = templateManager.validateTemplate('duplicate');
-      
+
       expect(variables).toEqual(['name']);
     });
   });
@@ -266,7 +275,7 @@ Participants: {{participants}}`;
       templateManager.createTemplate('meeting', template);
 
       const fields = templateManager.getRequiredFields('meeting');
-      
+
       expect(fields).toContain('title');
       expect(fields).toContain('date');
       expect(fields).toContain('participants');
@@ -277,7 +286,7 @@ Participants: {{participants}}`;
       templateManager.createTemplate('article', template);
 
       const missing = templateManager.validateRequiredFields('article', { title: 'Test' });
-      
+
       expect(missing).toContain('author');
       expect(missing).not.toContain('title');
     });
@@ -287,7 +296,7 @@ Participants: {{participants}}`;
       templateManager.createTemplate('simple', template);
 
       const missing = templateManager.validateRequiredFields('simple', { title: 'Test' });
-      
+
       expect(missing).toEqual([]);
     });
 

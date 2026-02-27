@@ -67,6 +67,10 @@ export class TemplateManager {
       result = result.replace(regex, value);
     }
 
+    // Replace any remaining placeholders with empty string
+    const remainingRegex = /\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}/g;
+    result = result.replace(remainingRegex, '');
+
     return result;
   }
 
