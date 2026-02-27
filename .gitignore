@@ -45,3 +45,6 @@ tmp/
 
 # Ralph Loop
 .ralph/
+
+# test vault
+tests_vault/

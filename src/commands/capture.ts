@@ -52,9 +52,12 @@ export function createCaptureCommand(): Command {
             const placeholders = templateManager.validateTemplate(options.template);
             const variables = { content: body, ...vars };
 
-            // Check for missing variables and warn
+            // Built-in placeholders are handled by processPlaceholders automatically
+            const BUILTIN_PLACEHOLDERS = new Set(['TITLE', 'UUID', 'DATE', 'TIME', 'VAULT']);
+
+            // Check for missing variables and warn (skip built-in placeholders)
             placeholders.forEach(p => {
-              if (!(p in variables)) {
+              if (!BUILTIN_PLACEHOLDERS.has(p) && !(p in variables)) {
                 console.warn(`⚠️ Warning: Template placeholder '{{${p}}}' has no value provided, using empty string.`);
               }
             });
@@ -64,7 +67,11 @@ export function createCaptureCommand(): Command {
               console.warn(`⚠️ Warning: Note content was provided but no '{{content}}' placeholder exists in template '${options.template}'. Content will be ignored.`);
             }
 
-            noteContent = templateManager.renderTemplate(options.template, variables);
+            noteContent = templateManager.renderTemplate(options.template, variables, {
+              title: options.title,
+              vault: vault.config.vaultPath.split('/').pop(),
+              date: new Date(),
+            });
           } else {
             // Fallback if template file not found
             const title = options.title || new Date().toISOString();

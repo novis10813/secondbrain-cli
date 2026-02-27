@@ -164,5 +164,50 @@ describe('capture path resolution', () => {
             expect(warnCalled).toBe(true);
             expect(warnMsg).toContain('content');
         });
+
+        it('template 中 {{TITLE}} 應被 --title 的值替換', async () => {
+            writeFileSync(join(tempDir, 'Templates', 'meeting.md'), '# {{TITLE}}\n\n{{content}}');
+            const cmd = createCaptureCommand();
+
+            await executeAction(cmd, '討論事項', { title: '我的標題', template: 'meeting' });
+
+            const content = readFileSync(join(tempDir, '我的標題.md'), 'utf-8');
+            expect(content).toContain('# 我的標題');
+            expect(content).not.toContain('{{TITLE}}');
+        });
+
+        it('template 中 {{UUID}} 應被自動生成的 UUID 替換', async () => {
+            writeFileSync(join(tempDir, 'Templates', 'meeting.md'), '---\nid: {{UUID}}\n---\n\n{{content}}');
+            const cmd = createCaptureCommand();
+
+            await executeAction(cmd, '內容', { title: 'uuid測試', template: 'meeting' });
+
+            const content = readFileSync(join(tempDir, 'uuid測試.md'), 'utf-8');
+            expect(content).not.toContain('{{UUID}}');
+            expect(content).toMatch(/id: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/);
+        });
+
+        it('built-in placeholder {{TITLE}}、{{UUID}}、{{DATE}} 不應觸發 warning', async () => {
+            writeFileSync(
+                join(tempDir, 'Templates', 'meeting.md'),
+                '---\nid: {{UUID}}\ncreated: {{DATE}}\n---\n\n# {{TITLE}}\n\n{{content}}'
+            );
+            const cmd = createCaptureCommand();
+
+            const warnings: string[] = [];
+            const originalWarn = console.warn;
+            console.warn = (msg: string) => warnings.push(msg);
+
+            try {
+                await executeAction(cmd, '測試內容', { title: '標題測試', template: 'meeting' });
+            } finally {
+                console.warn = originalWarn;
+            }
+
+            // 不應對 built-in placeholders 發出 warning
+            expect(warnings.some(w => w.includes('TITLE'))).toBe(false);
+            expect(warnings.some(w => w.includes('UUID'))).toBe(false);
+            expect(warnings.some(w => w.includes('DATE'))).toBe(false);
+        });
     });
 });
