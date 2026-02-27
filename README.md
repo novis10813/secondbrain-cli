@@ -1,202 +1,121 @@
-# SecondBrain CLI
+## SecondBrain CLI
 
-一個專為 LLM Agent 設計的 Obsidian Vault CLI 工具。
+SecondBrain CLI is a command-line tool for LLM agents and power users to work with Obsidian
+vaults. It keeps your vault fully compatible with Obsidian while providing a fast SQLite index
+and JSON-friendly APIs.
 
-## 功能特色
+For a Chinese version of this document, see `README_zh.md`.
 
-- **Dual-Storage 架構**: SQLite 索引 + 原始 Markdown 檔案
-- **完整的連結系統**: 支援 `[[wikilinks]]`、backlinks、orphans 偵測
-- **Agent-First 設計**: JSON 輸出、結構化資料、CLI 可 pipe
-- **Obsidian 相容**: 100% 相容現有 Obsidian vault
-- **標準化 Capture**: Template 系統強制 Agent 遵守格式
+## Features
 
-## 安裝
+- **Dual-storage architecture**: SQLite index + raw Markdown files (never rewrites your notes)
+- **Rich link system**: `[[wikilinks]]`, backlinks, outlinks, orphan detection
+- **Agent-first design**: JSON output, structured data, easy to pipe and script
+- **Obsidian compatibility**: Aligned with TFile / CachedMetadata, safe to use on existing vaults
+- **Standardized capture**: Template system that enforces consistent note formats
+
+## Installation
 
 ```bash
-# npm registry（公開套件）
 npm install -g @novis10813/secondbrain-cli
 ```
 
-支援 **Node.js 18+** 與 **Bun**。使用 `npm install` 安裝後，可用 `node dist/index.js` 或 `npx sb` 執行；專案開發與測試建議使用 Bun（`bun test`）。
+- **Runtime**: Node.js 18+ (required)
+- **Optional**: Bun for local development and tests (`bun test`, `bun run dev`)
 
-如果你用 `bun` 從 GitHub 安裝並看到 `Blocked ... postinstall/prepare`，需要先信任再重裝一次：
+After global install you can use the `sb` binary from anywhere.
 
-```bash
-bun pm -g trust @novis10813/secondbrain-cli
-bun add -g github:novis10813/secondbrain-cli#<tag>
-```
-
-## 快速開始
+## Quick start
 
 ```bash
-# 在 Obsidian vault 目錄初始化
+# 1) Initialize in an existing Obsidian vault
 cd ~/my-obsidian-vault
 sb init
 
-# 同步現有筆記
+# 2) Index existing notes into SQLite
 sb sync
 
-# 建立新筆記
-sb capture "這是筆記內容" --title="我的筆記" --tags="idea,work"
+# 3) Capture a new note with title and tags
+sb capture "This is the note content" \
+  --title="My note" \
+  --tags="idea,work"
 
-# 搜尋筆記
-sb search "API 設計" --tags="tech" --format=json
+# 4) Search notes (JSON output for agents)
+sb search "API design" --tags="tech" --format=json
 
-# 取得 backlinks
+# 5) Backlinks and outlinks
 sb backlinks <path-or-id>
-
-# 取得 outlinks（此筆記連結出去的筆記）
 sb outlinks <path-or-id>
 
-# 解析連結為 path:line:col（支援 note、note#heading、note#^block-id）
+# 6) Resolve linkpaths to path:line:col (for editors)
 sb open "My Note#Section"
 
-# 找孤兒筆記
+# 7) Find orphan notes (no links in or out)
 sb orphans
 ```
 
-## CLI 指令
+`<path-or-id>` accepts either a relative path inside the vault (e.g. `Projects/api-design.md`) or
+a basename that can be resolved uniquely.
 
-### 初始化與設定
+## CLI overview
 
-```bash
-sb init                              # 初始化 vault
-sb config list                       # 查看設定
-sb config get dailyNotesFolder       # 取得特定設定
-sb config set dailyNotesFolder Daily # 修改設定（可編輯：dailyNotesFolder, templatesFolder）
-```
+SecondBrain CLI groups commands into a few core utilities. Each has its own usage guide under
+`docs/`:
 
-### Vault 管理
+- **Vault management**: `sb vault ...` — multi-vault registry and active vault selection  
+  See `docs/vault.md`.
+- **Sync**: `sb sync` — scan Markdown files, parse, and update the SQLite index  
+  See `docs/sync.md`.
+- **Capture & templates**: `sb capture`, `sb template ...` — create notes and enforce formats  
+  See `docs/capture.md` and `docs/template.md`.
+- **Search**: `sb search` — query by name, tags, path prefix, links, headings, modification time  
+  See `docs/search.md`.
+- **Links & navigation**: `sb backlinks`, `sb outlinks`, `sb open` — link graph and positions  
+  See `docs/backlinks.md` and `docs/open.md`.
+- **Config & maintenance**: `sb config`, `sb stats`, `sb orphans`, `sb migrate`  
+  See `docs/config.md`, `docs/stats.md`, and `docs/migrate.md`.
 
-SecondBrain 支援管理多個 vault。你可以從任何目錄使用 `sb` 指令，透過設定 active vault。
+For a full command and module reference, see `docs/modules.md`.
 
-#### 初始化 vault
+## Data layout
 
-```bash
-# 在預設位置初始化 (~/vault/)
-sb vault init
-
-# 在當前目錄初始化
-sb vault init .
-
-# 在指定路徑初始化
-sb vault init /path/to/my-notes
-```
-
-#### 切換 vault
-
-```bash
-# 列出所有已註冊的 vault
-sb vault list
-
-# 設定當前 session 的 active vault（使用 eval）
-eval $(sb vault use my-notes)
-
-# 查看當前 active vault
-sb vault current
-```
-
-#### 設定預設 vault
-
-```bash
-# 查看預設 vault
-sb vault default
-
-# 設定預設 vault
-sb vault default set my-notes
-```
-
-#### 移除 vault 註冊
-
-```bash
-# 從註冊表中移除 vault（不會刪除檔案）
-sb vault delete my-notes
-```
-
-#### Vault 解析優先順序
-
-1. `SECONDBRAIN_VAULT` 環境變數（名稱或路徑）
-2. 當前目錄（向上查找 `.secondbrain/`）
-3. 預設 vault
-
-### 筆記管理
-
-```bash
-sb capture "內容" \                  # 建立筆記
-  --title="標題" \
-  --tags="tag1,tag2" \
-  --template="meeting"
-
-sb search "關鍵字" \                 # 搜尋
-  --tags="work" \
-  --path="Daily" \                  # 路徑前綴
-  --links-to="某筆記" \             # 只顯示連結到該筆記的檔案
-  --heading="標題文字" \            # 只顯示含該標題的檔案
-  --modified-after="2024-01-01" \   # 修改時間篩選
-  --limit=10 \
-  --format=json
-
-sb get <path-or-id>                  # 取得單一筆記（路徑或檔名）
-sb backlinks <path-or-id>            # 取得 backlinks
-sb outlinks <path-or-id>             # 取得 outlinks（此筆記連結出去的筆記）
-sb open <linkpath>                   # 解析連結為 path:line:col（編輯器導航）
-```
-
-### Vault 維護
-
-```bash
-sb sync                              # 同步索引
-sb stats                             # 統計資訊
-sb orphans                           # 孤兒筆記
-sb migrate                           # 從舊 schema 遷移至新 schema（files + content_metadata）
-```
-
-## 資料架構
-
-```
+```text
 /your-vault/
 ├── Projects/
-│   └── api-design.md               # 原始 Markdown
+│   └── api-design.md          # Raw Markdown files (Obsidian-compatible)
 ├── Daily/
 │   └── 2024-01-15.md
 └── .secondbrain/
-    ├── config.json                 # 設定檔
-    └── index.db                    # SQLite 索引
+    ├── config.json            # Vault config (paths, folders, DB path)
+    └── index.db               # SQLite index (files + metadata)
 ```
 
-## 開發
+The CLI reads and writes only inside the vault and `.secondbrain/` directory. Note content is
+never rewritten except when you explicitly create notes via `sb capture` or templates.
+
+## Development
 
 ```bash
-# 安裝依賴
+# Install dependencies
 bun install
 
-# 開發模式
+# Run from source
 bun run dev
 
-# 建置
+# Build TypeScript to dist/
 bun run build
 
-# 檢查型別
+# Type-check only
 bun run lint
 
-# 執行測試
+# Run tests
 bun test
 ```
+
+This repository targets Bun for development, but the published package works on standard Node.js
+18+ environments.
 
 ## License
 
 MIT
 
-## 發佈（npm registry）
-
-1) 建立 GitHub Personal Access Token（classic 或 fine-grained 皆可）
-
-- **最低需要**: `write:packages`（發佈）、`read:packages`（安裝）
-- 如果 repo 是 private，通常也需要能讀取 repo 的權限（依你的帳號/組織設定而定）
-
-2) 登入 npm registry 並發佈
-
-```bash
-npm login
-npm publish --access public
-```

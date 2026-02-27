@@ -1,8 +1,28 @@
 # SecondBrain CLI Documentation
 
-Index of technical documentation for the codebase.
+This directory contains documentation for both everyday CLI usage and internal implementation
+details.
 
-## Overview
+## Usage guides (one core utility per file)
+
+These documents explain how to use each major CLI capability:
+
+| Guide | Description |
+|-------|-------------|
+| [Vaults](./vault.md) | Multi-vault registry, `sb vault` subcommands, resolution priority |
+| [Sync](./sync.md) | How `sb sync` scans Markdown and updates the SQLite index |
+| [Capture](./capture.md) | Creating notes, templates, tags, and `path-or-id` behavior |
+| [Search](./search.md) | Query syntax and filters: tags, path prefix, links, headings, modified dates |
+| [Backlinks & outlinks](./backlinks.md) | Link graph commands: `sb backlinks` and `sb outlinks` |
+| [Open](./open.md) | Resolving linkpaths to `path:line:col` with `sb open` |
+| [Templates](./template.md) | `sb template` workflow and TemplateManager concepts |
+| [Config](./config.md) | Vault config file and `sb config` subcommands |
+| [Stats & orphans](./stats.md) | Vault stats, orphan detection, and maintenance commands |
+| [Migrate](./migrate.md) | When and how to run `sb migrate` (schema migration) |
+
+## Internal reference
+
+These documents are primarily for contributors and maintainers:
 
 | Document | Description |
 |----------|-------------|
