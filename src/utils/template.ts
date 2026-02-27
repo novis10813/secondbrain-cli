@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
-import type { Config } from '../types/index.js';
+import type { Config, PlaceholderContext } from '../types/index.js';
+import { processPlaceholders } from './placeholder.js';
 
 export class TemplateManager {
   private config: Config;
@@ -54,21 +55,23 @@ export class TemplateManager {
     unlinkSync(templatePath);
   }
 
-  renderTemplate(name: string, variables: Record<string, string>): string {
+  renderTemplate(name: string, variables: Record<string, string>, context?: PlaceholderContext): string {
     const template = this.getTemplate(name);
     if (!template) {
       throw new Error(`Template '${name}' not found`);
     }
 
-    // Replace all {{variable}} with values
-    let result = template;
+    // Step 1: Expand built-in placeholders (DATE, TIME, TITLE, VAULT, UUID)
+    let result = processPlaceholders(template, context ?? {});
+
+    // Step 2: Replace user-defined {{variable}} with provided values
     for (const [key, value] of Object.entries(variables)) {
       const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
       result = result.replace(regex, value);
     }
 
-    // Replace any remaining placeholders with empty string
-    const remainingRegex = /\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}/g;
+    // Step 3: Replace any remaining unresolved placeholders with empty string
+    const remainingRegex = /\{\{\s*[a-zA-Z_][a-zA-Z0-9_:+\-]*\s*\}\}/g;
     result = result.replace(remainingRegex, '');
 
     return result;

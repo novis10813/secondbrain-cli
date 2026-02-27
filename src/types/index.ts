@@ -160,6 +160,15 @@ export interface TemplateConfig {
   targetFolder?: string;
 }
 
+export interface PlaceholderContext {
+  /** 可注入測試用日期，預設 new Date() */
+  date?: Date;
+  /** 筆記標題（從 --title 傳入） */
+  title?: string;
+  /** Vault 名稱（basename of vault path） */
+  vault?: string;
+}
+
 export interface Config {
   vaultPath: string;
   captureFolder?: string;

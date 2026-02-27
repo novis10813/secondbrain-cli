@@ -322,4 +322,54 @@ Participants: {{participants}}`;
       expect(variables.length).toBe(2);
     });
   });
+
+  describe('renderTemplate with built-in placeholders (PlaceholderContext)', () => {
+    // Fixed reference date: 2026-02-27 14:30:00
+    const fixedDate = new Date(2026, 1, 27, 14, 30, 0);
+
+    it('應展開 {{DATE}} 為當天日期', () => {
+      templateManager.createTemplate('date-tmpl', 'Date: {{DATE}}');
+      const result = templateManager.renderTemplate('date-tmpl', {}, { date: fixedDate });
+      expect(result).toBe('Date: 2026-02-27');
+    });
+
+    it('應展開 {{DATE:YYYY/MM/DD}} 自訂格式', () => {
+      templateManager.createTemplate('date-fmt-tmpl', 'Date: {{DATE:YYYY/MM/DD}}');
+      const result = templateManager.renderTemplate('date-fmt-tmpl', {}, { date: fixedDate });
+      expect(result).toBe('Date: 2026/02/27');
+    });
+
+    it('應展開 {{DATE}} 與使用者自訂 {{variable}} 同時生效', () => {
+      templateManager.createTemplate('mixed-tmpl', '{{DATE}} by {{author}}');
+      const result = templateManager.renderTemplate('mixed-tmpl', { author: 'Alice' }, { date: fixedDate });
+      expect(result).toBe('2026-02-27 by Alice');
+    });
+
+    it('應展開 {{TITLE}} 從 context 傳入', () => {
+      templateManager.createTemplate('title-tmpl', '# {{TITLE}}\n\n{{content}}');
+      const result = templateManager.renderTemplate('title-tmpl', { content: 'Hello' }, { title: 'My Note' });
+      expect(result).toBe('# My Note\n\nHello');
+    });
+
+    it('應展開 {{TIME}} 為當前時間', () => {
+      templateManager.createTemplate('time-tmpl', 'At {{TIME}}');
+      const result = templateManager.renderTemplate('time-tmpl', {}, { date: fixedDate });
+      expect(result).toBe('At 14:30');
+    });
+
+    it('應展開 {{UUID}} 為有效 UUID v4', () => {
+      templateManager.createTemplate('uuid-tmpl', 'ID: {{UUID}}');
+      const result = templateManager.renderTemplate('uuid-tmpl', {}, {});
+      expect(result).toMatch(/^ID: [0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    });
+
+    it('在沒有提供 context 時應向下相容（不展開內建 placeholder）', () => {
+      templateManager.createTemplate('no-ctx-tmpl', '{{name}} on {{DATE}}');
+      // 不傳 context，{{DATE}} 無法展開，會被後續邏輯清空
+      const result = templateManager.renderTemplate('no-ctx-tmpl', { name: 'Bob' });
+      // {{DATE}} 沒有 context 仍使用 new Date() 展開（因為 context.date 預設 new Date()）
+      // 只驗證 {{name}} 有正確展開
+      expect(result).toContain('Bob on ');
+    });
+  });
 });

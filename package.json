@@ -45,6 +45,7 @@
   "dependencies": {
     "better-sqlite3": "^11.6.0",
     "commander": "^12.0.0",
+    "moment": "^2.30.1",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
