@@ -8,9 +8,18 @@ export function createGetCommand(): Command {
     .argument('<path-or-id>', 'File path (e.g. note.md or folder/note.md) or basename')
     .option('-f, --format <format>', 'Output format (json|text)', 'json')
     .action(async (pathOrId, options) => {
-      await withVault((vault) => {
-        const file = vault.resolvePathOrBasename(pathOrId);
-        const resolvedPath = file?.path ?? null;
+      await withVault(async (vault) => {
+        let file = vault.resolvePathOrBasename(pathOrId);
+        let resolvedPath = file?.path ?? null;
+
+        // Auto-sync fallback: if not found in index, sync and retry once.
+        // Handles cases where files were added or moved outside the CLI.
+        if (!resolvedPath) {
+          await vault.sync();
+          file = vault.resolvePathOrBasename(pathOrId);
+          resolvedPath = file?.path ?? null;
+        }
+
         if (!resolvedPath) {
           throw new Error('Note not found');
         }
