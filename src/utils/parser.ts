@@ -585,7 +585,10 @@ export class NoteParser {
     frontmatter: Record<string, unknown> = {}
   ): string {
     const fm = yaml.stringify(frontmatter).trim();
-    return `---\n${fm}\n---\n\n# ${title}\n\n${content}`;
+    // Content is the sole body — title is used for the filename,
+    // not injected as a heading. If a heading is needed, the caller
+    // or template should include it in content.
+    return `---\n${fm}\n---\n\n${content}`;
   }
 
   static generateDailyNoteContent(date: Date, content: string): string {
@@ -598,7 +601,8 @@ export class NoteParser {
       tags: ['daily'],
       type: 'daily-note'
     };
-    return this.generateNoteContent(dateStr, content, frontmatter);
+    // Daily notes include a date heading by convention
+    return this.generateNoteContent(dateStr, `# ${dateStr}\n\n${content}`, frontmatter);
   }
 
   /**
