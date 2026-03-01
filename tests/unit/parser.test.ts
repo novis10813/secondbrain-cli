@@ -1013,15 +1013,17 @@ tags: [x]
       expect(content).toContain('---');
       expect(content).toContain('tags:');
       expect(content).toContain('created: 2024-01-01');
-      expect(content).toContain('# 我的標題');
       expect(content).toContain('筆記內容');
+      // title is used for filename only, not injected as heading
+      expect(content).not.toContain('# 我的標題');
     });
 
     it('應該正確處理空 frontmatter', () => {
       const content = NoteParser.generateNoteContent('僅標題', '僅內容', {});
 
-      expect(content).toContain('# 僅標題');
       expect(content).toContain('僅內容');
+      // title is not injected as heading
+      expect(content).not.toContain('# 僅標題');
     });
   });
 

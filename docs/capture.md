@@ -11,8 +11,7 @@ It is designed to be easy to call from LLM agents and scripts.
 sb capture "Note content" \
   --title="My note" \
   --tags="tag1,tag2" \
-  --template="meeting" \
-  --path="Projects"
+  --template="meeting"
 ```
 
 Arguments and options:
@@ -21,7 +20,10 @@ Arguments and options:
 - `--title` (optional): title used for the note and filename when appropriate.
 - `--tags` (optional): comma-separated tags, stored in frontmatter.
 - `--template` (optional): template name under the configured templates folder.
-- `--path` (optional): target folder path inside the vault (e.g. `Daily`, `Projects/ClientA`).
+
+The target folder is determined by the template configuration (`targetFolder`) or
+`captureFolder` in `.secondbrain/config.json`. Notes are not placed via a CLI path flag;
+folder routing is part of the template's responsibility.
 
 The command writes a Markdown file, updates the SQLite index, and prints information suitable for
 agents to consume.
